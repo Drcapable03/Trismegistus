@@ -1,19 +1,24 @@
 import pandas as pd
-from sqlalchemy import create_engine
-
-engine = create_engine("postgresql+psycopg2://postgres:newpassword@localhost/Fooball_predictor")
+from utils.db import engine
 
 def calculate_team_form():
-    df = pd.read_sql("SELECT * FROM matches", engine)
-    # Average goals scored last 5 games per team
-    home_form = df.groupby("HomeTeam")["FTHG"].mean().reset_index()
-    away_form = df.groupby("AwayTeam")["FTAG"].mean().reset_index()
-    home_form.columns = ["team", "avg_goals_scored_home"]
-    away_form.columns = ["team", "avg_goals_scored_away"]
-    form = pd.merge(home_form, away_form, on="team", how="outer").fillna(0)
-    form["avg_goals_scored"] = (form["avg_goals_scored_home"] + form["avg_goals_scored_away"]) / 2
+    matches = pd.read_sql("SELECT * FROM matches", engine)
+    
+    # Home team stats
+    home_stats = matches.groupby("HomeTeam").agg({
+        "FTHG": "mean",  # Avg goals scored at home
+        "FTAG": "mean"   # Avg goals conceded at home
+    }).rename(columns={"FTHG": "avg_goals_scored", "FTAG": "avg_goals_conceded"})
+    
+    # Away team stats
+    away_stats = matches.groupby("AwayTeam").agg({
+        "FTAG": "mean",  # Avg goals scored away
+        "FTHG": "mean"   # Avg goals conceded away
+    }).rename(columns={"FTAG": "avg_goals_scored", "FTHG": "avg_goals_conceded"})
+    
+    # Combine and average
+    form = pd.concat([home_stats, away_stats]).groupby(level=0).mean()
+    form["team"] = form.index
     form.to_sql("team_form", engine, if_exists="replace", index=False)
     print("Team form calculated and saved!")
-
-if __name__ == "__main__":
-    calculate_team_form()
+    
