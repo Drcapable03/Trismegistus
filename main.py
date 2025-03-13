@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv 
 from scripts.scrape_football_data import scrape_matches
-from utils.db import load_csv_to_db 
+from utils.db import load_csv_to_db
 import pandas as pd
 from sqlalchemy import create_engine
 from utils.db import engine
@@ -14,7 +14,6 @@ def explore_data():
     print(df.head())
     print(df.columns)
 
-
 load_dotenv()
 
 def run_agent_task():
@@ -24,9 +23,17 @@ def predict_matches():
     weather_api_key = os.getenv("WEATHER_API_KEY")
     if not weather_api_key:
         raise ValueError("WEATHER_API_KEY missing in .env!")
+    
+    # Mock injuries CSV—replace with real data later
+    injuries_df = pd.DataFrame({
+        "team": ["Sheffield Weds", "Southampton", "Blackburn"],
+        "player": ["Player1", "Player2", "Player3"],
+        "status": ["out", "out", "doubtful"]
+    })
+    
     forger = GameForger(weather_api_key, sim_runs=1000)
-    forger.train()
-    predictions = forger.predict()
+    forger.train(injuries_df)
+    predictions = forger.predict(injuries_df=injuries_df)
     print("Predictions:")
     for pred in predictions:
         print(pred)
@@ -41,5 +48,5 @@ if __name__ == "__main__":
     explore_data()
     predict_matches()
     run_agent_task()
-
+    
     print("EVERYTHING DID WORK WELL!!")

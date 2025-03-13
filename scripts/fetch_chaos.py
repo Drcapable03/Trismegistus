@@ -34,30 +34,33 @@ def fetch_rss_sentiment(team, date):
         return 0
 
 def fetch_x_sentiment(team, date):
-    # Using Grok’s X search (simplified—real posts from March 11, 2025-ish)
+    # Placeholder—swap with real X API later
+    x_posts = [
+        f"{team} gonna smash it today!",
+        f"{team} looking shaky, injuries piling up",
+        f"Come on {team} let’s go!"
+    ]
+    sentiment = 0
+    count = 0
+    for post in x_posts:
+        blob = TextBlob(post)
+        sentiment += blob.sentiment.polarity
+        count += 1
+    score = sentiment / max(count, 1) if count else 0
+    print(f"X Sentiment for {team}: {score}")
+    return score
+
+def fetch_injuries(team, date, injuries_df):
     try:
-        # Mock X search (since I can’t scrape live here, but I’d fetch posts like:)
-        # x_posts = search_x(f"{team} football", date, limit=10)
-        # Fake sample for now—replace with real X API in production
-        x_posts = [
-            f"{team} gonna smash it today!", 
-            f"{team} looking shaky, injuries piling up",
-            f"Come on {team} let’s go!"
-        ]
-        sentiment = 0
-        count = 0
-        for post in x_posts:
-            blob = TextBlob(post)
-            sentiment += blob.sentiment.polarity
-            count += 1
-        score = sentiment / max(count, 1) if count else 0
-        print(f"X Sentiment for {team}: {score}")
-        return score
+        team_injuries = injuries_df[injuries_df["team"] == team]
+        key_players_out = len(team_injuries[team_injuries["status"] == "out"])
+        print(f"Injuries for {team}: {key_players_out} key players out")
+        return key_players_out
     except Exception as e:
-        print(f"X Sentiment fetch failed for {team}: {e}")
+        print(f"Injury fetch failed for {team}: {e}")
         return 0
 
-def get_chaos_data(matches, weather_api_key):
+def get_chaos_data(matches, weather_api_key, injuries_df):
     chaos_data = []
     limited_matches = matches.head(5)  # LIMIT TO 5 FOR TESTING—ADJUST FOR PRODUCTION
     for i, row in limited_matches.iterrows():
@@ -69,11 +72,14 @@ def get_chaos_data(matches, weather_api_key):
         away_rss = fetch_rss_sentiment(away, date)
         home_x = fetch_x_sentiment(home, date)
         away_x = fetch_x_sentiment(away, date)
+        home_injuries = fetch_injuries(home, date, injuries_df)
+        away_injuries = fetch_injuries(away, date, injuries_df)
         chaos_data.append({
             "HomeTeam": home, "AwayTeam": away, "Date": date,
             "rain": weather["rain"], "wind": weather["wind"],
             "home_rss_sentiment": home_rss, "away_rss_sentiment": away_rss,
-            "home_x_sentiment": home_x, "away_x_sentiment": away_x
+            "home_x_sentiment": home_x, "away_x_sentiment": away_x,
+            "home_injuries": home_injuries, "away_injuries": away_injuries
         })
     for i, row in matches.iloc[5:].iterrows():
         home, away, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
@@ -81,6 +87,7 @@ def get_chaos_data(matches, weather_api_key):
             "HomeTeam": home, "AwayTeam": away, "Date": date,
             "rain": 0, "wind": 0,
             "home_rss_sentiment": 0, "away_rss_sentiment": 0,
-            "home_x_sentiment": 0, "away_x_sentiment": 0
+            "home_x_sentiment": 0, "away_x_sentiment": 0,
+            "home_injuries": 0, "away_injuries": 0
         })
     return pd.DataFrame(chaos_data)

@@ -4,38 +4,44 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LinearRegression
 from utils.db import engine
 from scripts.fetch_chaos import get_chaos_data
+from scripts.fetch_referee import fetch_referee_bias
 
 class GameForger:
     def __init__(self, weather_api_key, sim_runs=1000):
-        self.outcome_model = GradientBoostingClassifier(n_estimators=100, random_state=42)
+        self.outcome_model = GradientBoostingClassifier(n_estimators=200, learning_rate=0.05, random_state=42)  # Tuned
         self.goals_model = LinearRegression()
         self.weather_api_key = weather_api_key
         self.sim_runs = sim_runs
         self.outcome_features = None
         self.goals_features = None
 
-    def prepare_data(self):
+    def prepare_data(self, injuries_df=None):
         matches = pd.read_sql("SELECT * FROM matches", engine)
         form = pd.read_sql("SELECT * FROM team_form", engine)
-        chaos = get_chaos_data(matches, self.weather_api_key)
+        chaos = get_chaos_data(matches, self.weather_api_key, injuries_df)
+        refs = fetch_referee_bias(matches)
 
         data = matches.merge(form.rename(columns={"team": "HomeTeam"}), on="HomeTeam") \
                       .merge(form.rename(columns={"team": "AwayTeam"}), on="AwayTeam", suffixes=("_home", "_away")) \
-                      .merge(chaos, on=["HomeTeam", "AwayTeam", "Date"])
+                      .merge(chaos, on=["HomeTeam", "AwayTeam", "Date"]) \
+                      .merge(refs, on=["HomeTeam", "AwayTeam", "Date"])
 
         X_outcome = data[[
             "avg_goals_scored_home", "avg_goals_scored_away",
             "avg_goals_conceded_home", "avg_goals_conceded_away",
             "B365H", "B365A", "B365D",
             "rain", "wind", "home_rss_sentiment", "away_rss_sentiment",
-            "home_x_sentiment", "away_x_sentiment"
+            "home_x_sentiment", "away_x_sentiment",
+            "home_injuries", "away_injuries",
+            "home_win_pct", "yellows_per_game"
         ]].fillna(0)
         y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0}).fillna(0)
 
         X_goals = data[[
             "avg_goals_scored_home", "avg_goals_scored_away",
             "avg_goals_conceded_home", "avg_goals_conceded_away",
-            "rain", "wind"
+            "rain", "wind", "home_injuries", "away_injuries",
+            "yellows_per_game"
         ]].fillna(0)
         y_goals = (data["FTHG"] + data["FTAG"]).fillna(0)
 
@@ -47,8 +53,8 @@ class GameForger:
 
         return X_outcome, y_outcome, X_goals, y_goals, data[["HomeTeam", "AwayTeam", "Date", "odds_error"]]
 
-    def train(self):
-        X_outcome, y_outcome, X_goals, y_goals, _ = self.prepare_data()
+    def train(self, injuries_df=None):
+        X_outcome, y_outcome, X_goals, y_goals, _ = self.prepare_data(injuries_df)
         self.outcome_model.fit(X_outcome, y_outcome)
         self.goals_model.fit(X_goals, y_goals)
 
@@ -62,8 +68,8 @@ class GameForger:
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
         return outcomes, goals
 
-    def predict(self, limit=5):
-        X_outcome, y_outcome, X_goals, y_goals, context = self.prepare_data()
+    def predict(self, limit=5, injuries_df=None):
+        X_outcome, y_outcome, X_goals, y_goals, context = self.prepare_data(injuries_df)
         results = []
         for i in range(min(limit, len(X_outcome))):
             home, away, date = context.iloc[i][["HomeTeam", "AwayTeam", "Date"]]
