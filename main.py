@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from scripts.scrape_football_data import scrape_matches
 from utils.db import load_csv_to_db
 import pandas as pd
-from sqlalchemy import create_engine
 from utils.db import engine
 from utils.features import calculate_team_form
 from predictors.game_forger import GameForger
@@ -24,14 +23,13 @@ def predict_matches():
     if not weather_api_key:
         raise ValueError("WEATHER_API_KEY missing in .env!")
     
-    # Mock injuries CSV—replace with real data later
     injuries_df = pd.DataFrame({
         "team": ["Sheffield Weds", "Southampton", "Blackburn"],
         "player": ["Player1", "Player2", "Player3"],
         "status": ["out", "out", "doubtful"]
     })
     
-    forger = GameForger(weather_api_key, sim_runs=1000)
+    forger = GameForger(weather_api_key, sim_runs=100)
     forger.train(injuries_df)
     predictions = forger.predict(injuries_df=injuries_df)
     print("Predictions:")

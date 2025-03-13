@@ -2,13 +2,14 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
 from utils.db import engine
 from scripts.fetch_chaos import get_chaos_data
 from scripts.fetch_referee import fetch_referee_bias
 
 class GameForger:
-    def __init__(self, weather_api_key, sim_runs=1000):
-        self.outcome_model = GradientBoostingClassifier(n_estimators=200, learning_rate=0.05, random_state=42)  # Tuned
+    def __init__(self, weather_api_key, sim_runs=100):
+        self.outcome_model = GradientBoostingClassifier(n_estimators=200, learning_rate=0.05, random_state=42)
         self.goals_model = LinearRegression()
         self.weather_api_key = weather_api_key
         self.sim_runs = sim_runs
@@ -51,30 +52,44 @@ class GameForger:
         self.outcome_features = X_outcome.columns
         self.goals_features = X_goals.columns
 
-        return X_outcome, y_outcome, X_goals, y_goals, data[["HomeTeam", "AwayTeam", "Date", "odds_error"]]
+        # Split: 80% train, 20% test
+        X_train_o, X_test_o, y_train_o, y_test_o = train_test_split(X_outcome, y_outcome, test_size=0.2, random_state=42)
+        X_train_g, X_test_g, y_train_g, y_test_g = train_test_split(X_goals, y_goals, test_size=0.2, random_state=42)
+        test_context = data.iloc[X_test_o.index][["HomeTeam", "AwayTeam", "Date", "odds_error"]]
+
+        return (X_train_o, y_train_o, X_train_g, y_train_g), (X_test_o, y_test_o, X_test_g, y_test_g), test_context
 
     def train(self, injuries_df=None):
-        X_outcome, y_outcome, X_goals, y_goals, _ = self.prepare_data(injuries_df)
-        self.outcome_model.fit(X_outcome, y_outcome)
-        self.goals_model.fit(X_goals, y_goals)
+        (X_train_o, y_train_o, X_train_g, y_train_g), (_, _, _, _), _ = self.prepare_data(injuries_df)
+        self.outcome_model.fit(X_train_o, y_train_o)
+        self.goals_model.fit(X_train_g, y_train_g)
+        raw_preds = self.outcome_model.predict(X_train_o)
+        raw_accuracy = (raw_preds == y_train_o).mean() * 100
+        print(f"Raw Model Accuracy (train): {raw_accuracy:.1f}%")
 
     def simulate_match(self, outcome_features, goals_features):
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
         
         probs = self.outcome_model.predict_proba(outcome_df)[0]
+        print(f"Prediction Probabilities: H={probs[1]:.2f}, A={probs[2]:.2f}, D={probs[0]:.2f}")
+        # Fix sims: Match probs order
+        outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=[probs[0], probs[1], probs[2]])  # D, H, A
         goals_pred = self.goals_model.predict(goals_df)[0]
-        outcomes = np.random.choice([1, 2, 0], size=self.sim_runs, p=probs)
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
         return outcomes, goals
 
     def predict(self, limit=5, injuries_df=None):
-        X_outcome, y_outcome, X_goals, y_goals, context = self.prepare_data(injuries_df)
+        (_, _, _, _), (X_test_o, y_test_o, X_test_g, y_test_g), context = self.prepare_data(injuries_df)
         results = []
-        for i in range(min(limit, len(X_outcome))):
+        test_preds = self.outcome_model.predict(X_test_o)
+        test_accuracy = (test_preds == y_test_o).mean() * 100
+        print(f"Test Model Accuracy (raw): {test_accuracy:.1f}%")
+        
+        for i in range(min(limit, len(X_test_o))):
             home, away, date = context.iloc[i][["HomeTeam", "AwayTeam", "Date"]]
-            outcome_features = X_outcome.iloc[i]
-            goals_features = X_goals.iloc[i]
+            outcome_features = X_test_o.iloc[i]
+            goals_features = X_test_g.iloc[i]
             outcomes, goals = self.simulate_match(outcome_features, goals_features)
             
             pred = np.bincount(outcomes).argmax()
