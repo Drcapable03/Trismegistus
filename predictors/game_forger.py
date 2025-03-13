@@ -27,7 +27,8 @@ class GameForger:
             "avg_goals_scored_home", "avg_goals_scored_away",
             "avg_goals_conceded_home", "avg_goals_conceded_away",
             "B365H", "B365A", "B365D",
-            "rain", "wind", "home_sentiment", "away_sentiment"
+            "rain", "wind", "home_rss_sentiment", "away_rss_sentiment",
+            "home_x_sentiment", "away_x_sentiment"
         ]].fillna(0)
         y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0}).fillna(0)
 
@@ -41,7 +42,6 @@ class GameForger:
         data["implied_prob_H"] = 1 / data["B365H"]
         data["odds_error"] = (data["FTR"] != "H") & (data["implied_prob_H"] > 0.7)
 
-        # Store feature names
         self.outcome_features = X_outcome.columns
         self.goals_features = X_goals.columns
 
@@ -53,7 +53,6 @@ class GameForger:
         self.goals_model.fit(X_goals, y_goals)
 
     def simulate_match(self, outcome_features, goals_features):
-        # Keep as DataFrame with original column names
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
         
