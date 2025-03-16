@@ -1,93 +1,49 @@
-import requests
-import feedparser
-from textblob import TextBlob
 import pandas as pd
+import requests
+import time
 
-def fetch_weather(city, date, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-    try:
-        response = requests.get(url, timeout=5).json()
-        rain = response.get("rain", {}).get("1h", 0)
-        wind = response.get("wind", {}).get("speed", 0)
-        print(f"Weather for {city}: rain={rain}, wind={wind}")
-        return {"rain": rain, "wind": wind}
-    except Exception as e:
-        print(f"Weather fetch failed for {city}: {e}")
-        return {"rain": 0, "wind": 0}
-
-def fetch_rss_sentiment(team, date):
-    rss_url = "https://feeds.bbci.co.uk/sport/football/rss.xml"
-    try:
-        feed = feedparser.parse(rss_url)
-        sentiment = 0
-        count = 0
-        for entry in feed.entries[:10]:
-            if team.lower() in entry.title.lower() or team.lower() in entry.summary.lower():
-                blob = TextBlob(entry.summary)
-                sentiment += blob.sentiment.polarity
-                count += 1
-        score = sentiment / max(count, 1) if count else 0
-        print(f"RSS Sentiment for {team}: {score}")
-        return score
-    except Exception as e:
-        print(f"RSS Sentiment fetch failed for {team}: {e}")
-        return 0
-
-def fetch_x_sentiment(team, date):
-    # Placeholder—swap with real X API later
-    x_posts = [
-        f"{team} gonna smash it today!",
-        f"{team} looking shaky, injuries piling up",
-        f"Come on {team} let’s go!"
-    ]
-    sentiment = 0
-    count = 0
-    for post in x_posts:
-        blob = TextBlob(post)
-        sentiment += blob.sentiment.polarity
-        count += 1
-    score = sentiment / max(count, 1) if count else 0
-    print(f"X Sentiment for {team}: {score}")
-    return score
-
-def fetch_injuries(team, date, injuries_df):
-    try:
-        team_injuries = injuries_df[injuries_df["team"] == team]
-        key_players_out = len(team_injuries[team_injuries["status"] == "out"])
-        print(f"Injuries for {team}: {key_players_out} key players out")
-        return key_players_out
-    except Exception as e:
-        print(f"Injury fetch failed for {team}: {e}")
-        return 0
-
-def get_chaos_data(matches, weather_api_key, injuries_df):
+def get_chaos_data(matches, weather_api_key=None, injuries_df=None):
     chaos_data = []
-    limited_matches = matches.head(5)  # LIMIT TO 5 FOR TESTING—ADJUST FOR PRODUCTION
-    for i, row in limited_matches.iterrows():
-        home, away, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
-        home_city = home.split()[0]
-        print(f"Fetching chaos for {home} vs. {away} on {date} ({i+1}/{len(limited_matches)})")
-        weather = fetch_weather(home_city, date, weather_api_key)
-        home_rss = fetch_rss_sentiment(home, date)
-        away_rss = fetch_rss_sentiment(away, date)
-        home_x = fetch_x_sentiment(home, date)
-        away_x = fetch_x_sentiment(away, date)
-        home_injuries = fetch_injuries(home, date, injuries_df)
-        away_injuries = fetch_injuries(away, date, injuries_df)
+    total_matches = len(matches)
+
+    for idx, row in matches.iterrows():
+        home_team, away_team, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
+        print(f"Fetching chaos for {home_team} vs. {away_team} on {date} ({idx+1}/{total_matches})")
+        
+        # Guess city from team name (e.g., "PSV Eindhoven" -> "Eindhoven")
+        # TODO: Later, scrape stadium coords from a source like Transfermarkt
+        city = home_team.split()[-1]  # Last word as fallback (e.g., "Eindhoven")
+        try:
+            # Geocode city to lat/lon (using free Nominatim API)
+            geo_url = f"https://nominatim.openstreetmap.org/search?q={city}&format=json&limit=1"
+            geo_response = requests.get(geo_url, headers={"User-Agent": "Trismegistus"})
+            geo_data = geo_response.json()
+            lat = float(geo_data[0]["lat"]) if geo_data else 0
+            lon = float(geo_data[0]["lon"]) if geo_data else 0
+
+            # Fetch weather from open-meteo
+            weather_url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={date}&end_date={date}&daily=precipitation_sum,wind_speed_10m_max&timezone=auto"
+            weather_response = requests.get(weather_url, timeout=5)
+            weather_response.raise_for_status()
+            weather = weather_response.json()["daily"]
+            rain = weather["precipitation_sum"][0] or 0
+            wind = weather["wind_speed_10m_max"][0] or 0
+        except Exception as e:
+            print(f"Weather fetch failed for {home_team}: {e}—using defaults")
+            rain, wind = 0, 0
+
+        # Sentiment placeholder (Reddit API for now, X later)
+        home_sentiment = 0.1  # TODO: Replace with real fetch
+        away_sentiment = 0.1
+
+        home_injuries = injuries_df[injuries_df["team"] == home_team]["status"].tolist() if injuries_df is not None else []
+        away_injuries = injuries_df[injuries_df["team"] == away_team]["status"].tolist() if injuries_df is not None else []
+
         chaos_data.append({
-            "HomeTeam": home, "AwayTeam": away, "Date": date,
-            "rain": weather["rain"], "wind": weather["wind"],
-            "home_rss_sentiment": home_rss, "away_rss_sentiment": away_rss,
-            "home_x_sentiment": home_x, "away_x_sentiment": away_x,
-            "home_injuries": home_injuries, "away_injuries": away_injuries
+            "HomeTeam": home_team, "AwayTeam": away_team, "Date": date,
+            "rain": rain, "wind": wind, "home_x_sentiment": home_sentiment, "away_x_sentiment": away_sentiment,
+            "home_injuries": len(home_injuries), "away_injuries": len(away_injuries)
         })
-    for i, row in matches.iloc[5:].iterrows():
-        home, away, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
-        chaos_data.append({
-            "HomeTeam": home, "AwayTeam": away, "Date": date,
-            "rain": 0, "wind": 0,
-            "home_rss_sentiment": 0, "away_rss_sentiment": 0,
-            "home_x_sentiment": 0, "away_x_sentiment": 0,
-            "home_injuries": 0, "away_injuries": 0
-        })
+        time.sleep(1)  # Rate limit
+
     return pd.DataFrame(chaos_data)
