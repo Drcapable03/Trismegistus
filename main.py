@@ -9,9 +9,9 @@ from scripts.backtest import backtest_predictions
 from datetime import datetime
 
 PAST_URLS = {
-    "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",  # Past results
+    "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
 }
-FUTURE_URL = "https://www.football-data.co.uk/fixtures.csv"  # Future fixtures
+FUTURE_URL = "https://www.football-data.co.uk/fixtures.csv"
 
 def explore_data():
     df = pd.read_sql("SELECT * FROM matches", engine)
@@ -51,14 +51,16 @@ def predict_matches():
 
 if __name__ == "__main__":
     print("Global Football Predictor is alive!")
+    # Clear DB for clean run (optional: comment out if you want to keep existing data)
+    pd.DataFrame().to_sql("matches", engine, if_exists="replace", index=False)
     # Scrape past data
     for league, url in PAST_URLS.items():
         csv_path = scrape_matches(url, league)
-        load_csv_to_db(csv_path, "matches", if_exists="append")  # Append past
+        load_csv_to_db(csv_path, "matches", if_exists="append")
     # Scrape future fixtures
     csv_path = scrape_matches(FUTURE_URL, "Fixtures")
-    load_csv_to_db(csv_path, "matches", if_exists="append")  # Append future
-    calculate_team_form()  # Use past data
+    load_csv_to_db(csv_path, "matches", if_exists="append")
+    calculate_team_form()
     explore_data()
     predict_matches()
     run_agent_task()
