@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv 
 from scripts.scrape_football_data import scrape_matches
-from utils.db import load_csv_to_db, engine
+from utils.db import load_csv_to_db, engine, reset_table
 import pandas as pd
 from utils.features import calculate_team_form
 from predictors.game_forger import GameForger
@@ -51,8 +51,8 @@ def predict_matches():
 
 if __name__ == "__main__":
     print("Global Football Predictor is alive!")
-    # Clear DB for clean run (optional: comment out if you want to keep existing data)
-    pd.DataFrame().to_sql("matches", engine, if_exists="replace", index=False)
+    # Reset DB for clean run
+    reset_table("matches")
     # Scrape past data
     for league, url in PAST_URLS.items():
         csv_path = scrape_matches(url, league)
