@@ -8,12 +8,12 @@ from scripts.fetch_chaos import get_chaos_data
 from scripts.fetch_referee import fetch_referee_bias
 
 class GameForger:
-    def __init__(self, weather_api_key, sim_runs=1000):  # More sims for precision
+    def __init__(self, weather_api_key, sim_runs=1000):
         self.outcome_model = GradientBoostingClassifier(
-            n_estimators=200, learning_rate=0.05, max_depth=3,  # Deeper trees
-            min_samples_split=10, min_samples_leaf=5, random_state=42  # Regularization
+            n_estimators=150, learning_rate=0.01, max_depth=3,  # Slower learning
+            min_samples_split=20, min_samples_leaf=10, random_state=42  # More regularization
         )
-        self.goals_model = PoissonRegressor(alpha=0.1)
+        self.goals_model = PoissonRegressor(alpha=0.5)  # Increase alpha
         self.weather_api_key = weather_api_key
         self.sim_runs = sim_runs
         self.outcome_features = None
@@ -22,10 +22,9 @@ class GameForger:
         self.test_data = None
         self.context = None
 
-    def prepare_data(self, injuries_df=None, limit=None):  # No limit—global scale
+    def prepare_data(self, injuries_df=None, limit=None):
         matches = pd.read_sql("SELECT * FROM matches", engine)
-        if limit is None:
-            limit = len(matches)  # Use all matches
+        limit = min(limit or len(matches), 50)  # Default to 50
         matches = matches.sort_values("Date", ascending=False).head(limit)
         form = pd.read_sql("SELECT * FROM team_form", engine)
         chaos = get_chaos_data(matches, self.weather_api_key, injuries_df)
@@ -42,7 +41,8 @@ class GameForger:
             "avg_goals_scored_home", "avg_goals_scored_away",
             "B365H", "B365A", "B365D",
             "home_x_sentiment", "away_x_sentiment",
-            "rain", "wind", "home_win_pct", "yellows_per_game"  # Chaos + refs
+            "rain", "wind", "home_win_pct", "yellows_per_game",
+            "odds_H"  # New: OddsAPI integration
         ]].fillna(0)
         y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0}).fillna(0)
 
@@ -83,7 +83,7 @@ class GameForger:
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
         return outcomes, goals
 
-    def predict(self, confidence_threshold=75.0):  # Higher threshold
+    def predict(self, confidence_threshold=75.0):
         if self.test_data is None:
             raise ValueError("Run train() first!")
         X_test_o, y_test_o, X_test_g, y_test_g = self.test_data
