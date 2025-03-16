@@ -24,18 +24,16 @@ def run_agent_task():
     print("Agent disabled—news fetching skipped for now.")
 
 def predict_matches():
-    weather_api_key = os.getenv("WEATHER_API_KEY")  # Unused now
+    weather_api_key = os.getenv("WEATHER_API_KEY")
     injuries_df = pd.DataFrame({
         "team": ["Sheffield Weds", "Southampton"],
         "player": ["Player1", "Player2"],
         "status": ["out", "out"]
     })
-    
     matches = pd.read_sql("SELECT * FROM matches", engine)
     print(f"Processing {len(matches)} matches")
-    
     forger = GameForger(weather_api_key)
-    forger.train(injuries_df)
+    forger.train(injuries_df, limit=50)  # Cap at 50
     predictions = forger.predict(confidence_threshold=75.0)
     print("Predictions:")
     for pred in predictions:
