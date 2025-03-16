@@ -8,9 +8,10 @@ from predictors.game_forger import GameForger
 from scripts.backtest import backtest_predictions
 from datetime import datetime
 
-LEAGUE_URLS = {
-    "Eredivisie": "https://www.football-data.co.uk/mmz4281/2425/N1.csv",
+PAST_URLS = {
+    "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",  # Past results
 }
+FUTURE_URL = "https://www.football-data.co.uk/fixtures.csv"  # Future fixtures
 
 def explore_data():
     df = pd.read_sql("SELECT * FROM matches", engine)
@@ -31,29 +32,33 @@ def predict_matches():
     })
     matches = pd.read_sql("SELECT * FROM matches", engine)
     
-    # Filter for future matches (post-March 17, 2025)
+    # Filter future matches
     matches["Date"] = pd.to_datetime(matches["Date"], format="%d/%m/%Y")
-    future_date = datetime(2025, 3, 17)
+    future_date = datetime(2025, 3, 2)  # Start March 2
     future_matches = matches[matches["Date"] >= future_date]
     if len(future_matches) == 0:
-        print("No future matches found after March 17, 2025!")
+        print("No future matches found after March 2, 2025!")
         return
     
     print(f"Processing {len(future_matches)} future matches")
     forger = GameForger(weather_api_key)
-    forger.train(injuries_df, limit=min(50, len(future_matches)))  # Cap at 50
+    forger.train(injuries_df, limit=min(50, len(future_matches)))
     predictions = forger.predict(confidence_threshold=75.0)
     print("Predictions:")
     for pred in predictions:
         print(pred)
-    backtest_predictions(predictions, future_matches)
+    print("Backtest skipped—future matches have no results.")
 
 if __name__ == "__main__":
     print("Global Football Predictor is alive!")
-    for league, url in LEAGUE_URLS.items():
+    # Scrape past data
+    for league, url in PAST_URLS.items():
         csv_path = scrape_matches(url, league)
-        load_csv_to_db(csv_path, "matches")
-    calculate_team_form()
+        load_csv_to_db(csv_path, "matches", if_exists="append")  # Append past
+    # Scrape future fixtures
+    csv_path = scrape_matches(FUTURE_URL, "Fixtures")
+    load_csv_to_db(csv_path, "matches", if_exists="append")  # Append future
+    calculate_team_form()  # Use past data
     explore_data()
     predict_matches()
     run_agent_task()
