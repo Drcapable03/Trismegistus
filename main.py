@@ -1,12 +1,17 @@
 import os
 from dotenv import load_dotenv 
 from scripts.scrape_football_data import scrape_matches
-from utils.db import load_csv_to_db
+from utils.db import load_csv_to_db, engine
 import pandas as pd
-from utils.db import engine
 from utils.features import calculate_team_form
 from predictors.game_forger import GameForger
 from scripts.backtest import backtest_predictions
+
+LEAGUE_URLS = {
+    "Eredivisie": "https://www.football-data.co.uk/mmz4281/2425/N1.csv",  # Updated URL
+    "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
+    # Add more later
+}
 
 def explore_data():
     df = pd.read_sql("SELECT * FROM matches", engine)
@@ -19,32 +24,31 @@ def run_agent_task():
     print("Agent disabled—news fetching skipped for now.")
 
 def predict_matches():
-    weather_api_key = os.getenv("WEATHER_API_KEY")
-    if not weather_api_key:
-        raise ValueError("WEATHER_API_KEY missing in .env!")
-    
+    weather_api_key = os.getenv("WEATHER_API_KEY")  # Unused now
     injuries_df = pd.DataFrame({
-        "team": ["Sheffield Weds", "Southampton", "Blackburn"],
-        "player": ["Player1", "Player2", "Player3"],
-        "status": ["out", "out", "doubtful"]
+        "team": ["Sheffield Weds", "Southampton"],
+        "player": ["Player1", "Player2"],
+        "status": ["out", "out"]
     })
     
-    forger = GameForger(weather_api_key, sim_runs=100)
+    matches = pd.read_sql("SELECT * FROM matches", engine)
+    print(f"Processing {len(matches)} matches")
+    
+    forger = GameForger(weather_api_key)
     forger.train(injuries_df)
-    predictions = forger.predict(injuries_df=injuries_df)
+    predictions = forger.predict(confidence_threshold=75.0)
     print("Predictions:")
     for pred in predictions:
         print(pred)
-    matches = pd.read_sql("SELECT * FROM matches", engine)
     backtest_predictions(predictions, matches)
 
 if __name__ == "__main__":
     print("Global Football Predictor is alive!")
-    scrape_matches()
-    load_csv_to_db("C:/Users/ASUS/Trismegistus/data/raw_matches.csv", "matches")
+    for league, url in LEAGUE_URLS.items():
+        csv_path = scrape_matches(url, league)
+        load_csv_to_db(csv_path, "matches")  # Overwrites—append later
     calculate_team_form()
     explore_data()
     predict_matches()
     run_agent_task()
-    
     print("EVERYTHING DID WORK WELL!!")
