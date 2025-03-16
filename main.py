@@ -8,9 +8,8 @@ from predictors.game_forger import GameForger
 from scripts.backtest import backtest_predictions
 
 LEAGUE_URLS = {
-    "Eredivisie": "https://www.football-data.co.uk/mmz4281/2425/N1.csv",  # Updated URL
-    "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
-    # Add more later
+    "Eredivisie": "https://www.football-data.co.uk/mmz4281/2425/N1.csv",
+    # "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
 }
 
 def explore_data():
@@ -33,7 +32,7 @@ def predict_matches():
     matches = pd.read_sql("SELECT * FROM matches", engine)
     print(f"Processing {len(matches)} matches")
     forger = GameForger(weather_api_key)
-    forger.train(injuries_df, limit=50)  # Cap at 50
+    forger.train(injuries_df, limit=50)
     predictions = forger.predict(confidence_threshold=75.0)
     print("Predictions:")
     for pred in predictions:
@@ -44,7 +43,7 @@ if __name__ == "__main__":
     print("Global Football Predictor is alive!")
     for league, url in LEAGUE_URLS.items():
         csv_path = scrape_matches(url, league)
-        load_csv_to_db(csv_path, "matches")  # Overwrites—append later
+        load_csv_to_db(csv_path, "matches")
     calculate_team_form()
     explore_data()
     predict_matches()
