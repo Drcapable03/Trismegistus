@@ -10,10 +10,10 @@ from scripts.fetch_referee import fetch_referee_bias
 class GameForger:
     def __init__(self, weather_api_key, sim_runs=1000):
         self.outcome_model = GradientBoostingClassifier(
-            n_estimators=150, learning_rate=0.01, max_depth=3,  # Slower learning
-            min_samples_split=20, min_samples_leaf=10, random_state=42  # More regularization
+            n_estimators=150, learning_rate=0.01, max_depth=3,
+            min_samples_split=20, min_samples_leaf=10, random_state=42
         )
-        self.goals_model = PoissonRegressor(alpha=0.5)  # Increase alpha
+        self.goals_model = PoissonRegressor(alpha=0.5)
         self.weather_api_key = weather_api_key
         self.sim_runs = sim_runs
         self.outcome_features = None
@@ -22,35 +22,47 @@ class GameForger:
         self.test_data = None
         self.context = None
 
+    def calculate_h2h(self, matches):
+        h2h = matches.groupby(["HomeTeam", "AwayTeam"]).agg({
+            "FTR": lambda x: (x == "H").mean(),  # Home win rate
+            "FTHG": "mean", "FTAG": "mean"
+        }).reset_index().rename(columns={"FTR": "h2h_home_win_pct", "FTHG": "h2h_avg_home_goals", "FTAG": "h2h_avg_away_goals"})
+        return h2h
+
     def prepare_data(self, injuries_df=None, limit=None):
         matches = pd.read_sql("SELECT * FROM matches", engine)
-        limit = min(limit or len(matches), 50)  # Default to 50
+        limit = min(limit or len(matches), 50)
         matches = matches.sort_values("Date", ascending=False).head(limit)
-        form = pd.read_sql("SELECT * FROM team_form", engine)
+        form = pd.read_sql("SELECT * FROM team_form", engine) if "team_form" in engine.table_names() else pd.DataFrame()
         chaos = get_chaos_data(matches, self.weather_api_key, injuries_df)
         refs = fetch_referee_bias(matches)
+        h2h = self.calculate_h2h(pd.read_sql("SELECT * FROM matches", engine))  # Use all past data
 
         data = matches.merge(form.rename(columns={"team": "HomeTeam"}), on="HomeTeam", how="left", suffixes=("", "_home")) \
                       .merge(form.rename(columns={"team": "AwayTeam"}), on="AwayTeam", how="left", suffixes=("_home", "_away")) \
                       .merge(chaos, on=["HomeTeam", "AwayTeam", "Date"], how="left") \
-                      .merge(refs, on=["HomeTeam", "AwayTeam", "Date"], how="left")
+                      .merge(refs, on=["HomeTeam", "AwayTeam", "Date"], how="left") \
+                      .merge(h2h, on=["HomeTeam", "AwayTeam"], how="left")
 
         print("Merged Data Columns:", data.columns.tolist())
 
-        X_outcome = data[[
-            "avg_goals_scored_home", "avg_goals_scored_away",
-            "B365H", "B365A", "B365D",
-            "home_x_sentiment", "away_x_sentiment",
-            "rain", "wind", "home_win_pct", "yellows_per_game",
-            "odds_H"  # New: OddsAPI integration
-        ]].fillna(0)
-        y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0}).fillna(0)
+        outcome_cols = ["B365H", "B365A", "B365D", "home_x_sentiment", "away_x_sentiment", 
+                        "rain", "wind", "home_win_pct", "yellows_per_game", "odds_H", "odds_A", "odds_D",
+                        "h2h_home_win_pct", "h2h_avg_home_goals", "h2h_avg_away_goals"]
+        if "avg_goals_scored_home" in data.columns:
+            outcome_cols.extend(["avg_goals_scored_home", "avg_goals_scored_away"])
+        
+        X_outcome = data[outcome_cols].fillna(0)
+        y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0}).fillna(0) if "FTR" in data.columns else pd.Series([0] * len(data))
 
-        X_goals = data[["avg_goals_scored_home", "avg_goals_scored_away", "rain", "wind"]].fillna(0)
-        y_goals = (data["FTHG"] + data["FTAG"]).fillna(0)
+        goals_cols = ["rain", "wind", "h2h_avg_home_goals", "h2h_avg_away_goals"]
+        if "avg_goals_scored_home" in data.columns:
+            goals_cols.extend(["avg_goals_scored_home", "avg_goals_scored_away"])
+        X_goals = data[goals_cols].fillna(0)
+        y_goals = (data["FTHG"] + data["FTAG"]).fillna(0) if "FTHG" in data.columns else pd.Series([0] * len(data))
 
         data["implied_prob_H"] = 1 / data["B365H"]
-        data["odds_error"] = (data["FTR"] != "H") & (data["implied_prob_H"] > 0.7)
+        data["odds_error"] = (data["FTR"] != "H") & (data["implied_prob_H"] > 0.7) if "FTR" in data.columns else pd.Series([False] * len(data))
 
         self.outcome_features = X_outcome.columns
         self.goals_features = X_goals.columns
