@@ -6,10 +6,10 @@ import pandas as pd
 from utils.features import calculate_team_form
 from predictors.game_forger import GameForger
 from scripts.backtest import backtest_predictions
+from datetime import datetime
 
 LEAGUE_URLS = {
     "Eredivisie": "https://www.football-data.co.uk/mmz4281/2425/N1.csv",
-    # "Premier League": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
 }
 
 def explore_data():
@@ -30,14 +30,23 @@ def predict_matches():
         "status": ["out", "out"]
     })
     matches = pd.read_sql("SELECT * FROM matches", engine)
-    print(f"Processing {len(matches)} matches")
+    
+    # Filter for future matches (post-March 17, 2025)
+    matches["Date"] = pd.to_datetime(matches["Date"], format="%d/%m/%Y")
+    future_date = datetime(2025, 3, 17)
+    future_matches = matches[matches["Date"] >= future_date]
+    if len(future_matches) == 0:
+        print("No future matches found after March 17, 2025!")
+        return
+    
+    print(f"Processing {len(future_matches)} future matches")
     forger = GameForger(weather_api_key)
-    forger.train(injuries_df, limit=50)
+    forger.train(injuries_df, limit=min(50, len(future_matches)))  # Cap at 50
     predictions = forger.predict(confidence_threshold=75.0)
     print("Predictions:")
     for pred in predictions:
         print(pred)
-    backtest_predictions(predictions, matches)
+    backtest_predictions(predictions, future_matches)
 
 if __name__ == "__main__":
     print("Global Football Predictor is alive!")
