@@ -58,11 +58,17 @@ poetry run python main.py --reset --ingest --backtest --limit 30
 4. `docs/OSS_RESEARCH.md` — what to adopt next
 5. `pyproject.toml` — dependencies
 
-### Next steps after Phase 1 core
-1. Run `poetry install && poetry run pytest`
-2. Run `poetry run python main.py --backtest`
-3. Integrate `penaltyblog` implied-odds for backtest baseline
-4. Phase 2: Scrapling wrapper for injuries/odds fallback
+### Phase 1b completed (2026-06-20)
+- Chaos SQLite cache (`utils/chaos_cache.py`) — `--refresh-cache` / `--no-cache`
+- Model persistence (`predictors/registry.py`) — `--save-model` / `--load-model`
+- Overround-stripped bookie baseline (`evaluation/implied_odds.py`)
+- Expandable leagues config (9 inactive slots, multi-season `2425`+`2526`)
+- `docs/API_COSTS.md` — subscription guidance ($0 viable)
+
+### Next steps
+1. Phase 2: `soccerdata` for Understat xG + Club Elo
+2. Phase 2: Scrapling for injuries/live odds scrape
+3. Optional: `penaltyblog` Shin method for implied odds
 
 ### Open questions
 - None blocking Phase 1

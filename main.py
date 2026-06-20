@@ -1,15 +1,15 @@
 import argparse
-import os
 
 import pandas as pd
 from dotenv import load_dotenv
 
-from config.settings import fixtures_url, league_urls, today
+from config.settings import fixtures_url, league_summary, league_urls, today
 from predictors.blunder_sniffer import BlunderSniffer
-from predictors.game_forger import _is_completed, _parse_dates
-from predictors.game_forger import GameForger
+from predictors.game_forger import GameForger, _is_completed, _parse_dates
+from predictors.registry import latest_model_path, load_game_forger, save_game_forger
 from scripts.backtest import backtest_predictions, format_prediction
 from scripts.scrape_football_data import scrape_matches
+from utils.chaos_cache import cache_stats
 from utils.db import ensure_schema, load_csv_to_db, read_matches, reset_table
 from utils.features import calculate_team_form
 
@@ -28,6 +28,7 @@ def ingest_data(reset: bool = False) -> None:
     else:
         ensure_schema("matches")
 
+    print(league_summary())
     for league, url in league_urls().items():
         csv_path = scrape_matches(url, league)
         load_csv_to_db(csv_path, "matches")
@@ -45,9 +46,14 @@ def get_future_matches(matches: pd.DataFrame) -> pd.DataFrame:
     return upcoming[upcoming["Date"] >= now].sort_values("Date")
 
 
-def run_backtest(limit: int = 200) -> None:
+def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool = False) -> GameForger:
     forger = GameForger()
-    forger.train(injuries_df=DEFAULT_INJURIES, limit=limit)
+    forger.train(
+        injuries_df=DEFAULT_INJURIES,
+        limit=limit,
+        use_cache=use_cache,
+        refresh_cache=refresh_cache,
+    )
     forger.evaluate_holdout()
     predictions = forger.backtest_on_holdout(confidence_threshold=0.0)
     matches = read_matches()
@@ -60,9 +66,16 @@ def run_backtest(limit: int = 200) -> None:
         print("\nBookie Blunders (BlunderSniffer):")
         for b in blunders:
             print(f"  {b}")
+    return forger
 
 
-def run_predict(confidence: float = 75.0, limit: int = 50) -> None:
+def run_predict(
+    confidence: float = 75.0,
+    limit: int = 50,
+    use_cache: bool = True,
+    refresh_cache: bool = False,
+    model_path: str | None = None,
+) -> None:
     matches = read_matches()
     future = get_future_matches(matches)
     if future.empty:
@@ -71,8 +84,23 @@ def run_predict(confidence: float = 75.0, limit: int = 50) -> None:
 
     print(f"Processing {len(future)} future matches")
     forger = GameForger()
-    forger.train(injuries_df=DEFAULT_INJURIES, limit=limit)
-    forger.prepare_prediction_data(future.head(50), injuries_df=DEFAULT_INJURIES)
+
+    if model_path:
+        load_game_forger(forger, model_path)
+    else:
+        forger.train(
+            injuries_df=DEFAULT_INJURIES,
+            limit=limit,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+        )
+
+    forger.prepare_prediction_data(
+        future.head(50),
+        injuries_df=DEFAULT_INJURIES,
+        use_cache=use_cache,
+        refresh_cache=refresh_cache,
+    )
     predictions = forger.predict(confidence_threshold=confidence)
     print("\nPredictions:")
     for pred in predictions:
@@ -85,6 +113,8 @@ def explore_data() -> None:
     print(df.columns.tolist())
     completed = _is_completed(df).sum()
     print(f"Completed: {completed}, Total: {len(df)}")
+    print(league_summary())
+    print(f"Chaos cache: {cache_stats()}")
 
 
 def main():
@@ -96,8 +126,13 @@ def main():
     parser.add_argument("--reset", action="store_true", help="Drop and recreate matches table before ingest")
     parser.add_argument("--confidence", type=float, default=75.0, help="Min confidence %% for predictions")
     parser.add_argument("--limit", type=int, default=200, help="Max completed matches for training")
+    parser.add_argument("--save-model", action="store_true", help="Save trained model after backtest")
+    parser.add_argument("--load-model", type=str, default=None, help="Path to saved model for --predict")
+    parser.add_argument("--refresh-cache", action="store_true", help="Re-fetch chaos data ignoring cache")
+    parser.add_argument("--no-cache", action="store_true", help="Disable chaos cache reads/writes")
     args = parser.parse_args()
 
+    use_cache = not args.no_cache
     run_all = not any([args.ingest, args.predict, args.backtest, args.explore])
 
     print("Trismegistus is alive!")
@@ -106,9 +141,25 @@ def main():
     if args.explore or run_all:
         explore_data()
     if args.backtest or run_all:
-        run_backtest(limit=args.limit)
+        forger = run_backtest(
+            limit=args.limit,
+            use_cache=use_cache,
+            refresh_cache=args.refresh_cache,
+        )
+        if args.save_model:
+            save_game_forger(forger)
+        elif run_all:
+            path = latest_model_path()
+            if path:
+                print(f"Tip: use --save-model to persist, or --load-model {path}")
     if args.predict:
-        run_predict(confidence=args.confidence, limit=args.limit)
+        run_predict(
+            confidence=args.confidence,
+            limit=args.limit,
+            use_cache=use_cache,
+            refresh_cache=args.refresh_cache,
+            model_path=args.load_model,
+        )
     print("Done.")
 
 

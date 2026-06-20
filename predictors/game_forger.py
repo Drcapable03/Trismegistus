@@ -23,7 +23,12 @@ def _is_completed(df: pd.DataFrame) -> pd.Series:
     return df["FTR"].isin(["H", "D", "A"])
 
 
-def _merge_features(matches: pd.DataFrame, injuries_df=None) -> pd.DataFrame:
+def _merge_features(
+    matches: pd.DataFrame,
+    injuries_df=None,
+    use_cache: bool = True,
+    refresh_cache: bool = False,
+) -> pd.DataFrame:
     matches = matches.copy()
     if pd.api.types.is_datetime64_any_dtype(matches["Date"]):
         matches["Date"] = matches["Date"].dt.strftime("%d/%m/%Y")
@@ -33,7 +38,9 @@ def _merge_features(matches: pd.DataFrame, injuries_df=None) -> pd.DataFrame:
         if inspect(engine).has_table("team_form")
         else pd.DataFrame()
     )
-    chaos = get_chaos_data(matches, injuries_df=injuries_df)
+    chaos = get_chaos_data(
+        matches, injuries_df=injuries_df, use_cache=use_cache, refresh=refresh_cache,
+    )
     refs = fetch_referee_bias(matches)
     all_matches = pd.read_sql("SELECT * FROM matches", engine)
     all_matches = _parse_dates(all_matches)
@@ -86,7 +93,13 @@ class GameForger:
             goals_cols.extend(["avg_goals_scored_home", "avg_goals_scored_away"])
         return outcome_cols, goals_cols
 
-    def prepare_training_data(self, injuries_df=None, limit: int | None = None):
+    def prepare_training_data(
+        self,
+        injuries_df=None,
+        limit: int | None = None,
+        use_cache: bool = True,
+        refresh_cache: bool = False,
+    ):
         matches = _parse_dates(pd.read_sql("SELECT * FROM matches", engine))
         completed = matches[_is_completed(matches)].sort_values("Date", ascending=False)
         if limit:
@@ -94,7 +107,9 @@ class GameForger:
         if completed.empty:
             raise ValueError("No completed matches with results found for training.")
 
-        data = _merge_features(completed, injuries_df)
+        data = _merge_features(
+            completed, injuries_df, use_cache=use_cache, refresh_cache=refresh_cache,
+        )
         outcome_cols, goals_cols = self._feature_columns(data)
 
         X_outcome = data[outcome_cols].fillna(0)
@@ -108,8 +123,9 @@ class GameForger:
         self.outcome_features = list(X_outcome.columns)
         self.goals_features = list(X_goals.columns)
 
+        stratify = y_outcome if y_outcome.value_counts().min() >= 2 else None
         X_train_o, X_test_o, y_train_o, y_test_o = train_test_split(
-            X_outcome, y_outcome, test_size=0.2, random_state=42, stratify=y_outcome,
+            X_outcome, y_outcome, test_size=0.2, random_state=42, stratify=stratify,
         )
         X_train_g, X_test_g, y_train_g, y_test_g = train_test_split(
             X_goals, y_goals, test_size=0.2, random_state=42,
@@ -121,12 +137,20 @@ class GameForger:
         self.context = test_context
         print(f"Prepared training data: {len(completed)} completed matches")
 
-    def prepare_prediction_data(self, future_matches: pd.DataFrame, injuries_df=None):
+    def prepare_prediction_data(
+        self,
+        future_matches: pd.DataFrame,
+        injuries_df=None,
+        use_cache: bool = True,
+        refresh_cache: bool = False,
+    ):
         future_matches = _parse_dates(future_matches)
         if future_matches.empty:
             self.prediction_data = None
             return
-        data = _merge_features(future_matches, injuries_df)
+        data = _merge_features(
+            future_matches, injuries_df, use_cache=use_cache, refresh_cache=refresh_cache,
+        )
         outcome_cols, goals_cols = self._feature_columns(data)
         self.prediction_data = {
             "X_outcome": data[outcome_cols].fillna(0),
@@ -135,9 +159,17 @@ class GameForger:
         }
         print(f"Prepared {len(future_matches)} future matches for prediction")
 
-    def train(self, injuries_df=None, limit: int | None = None):
+    def train(
+        self,
+        injuries_df=None,
+        limit: int | None = None,
+        use_cache: bool = True,
+        refresh_cache: bool = False,
+    ):
         if self.train_data is None:
-            self.prepare_training_data(injuries_df, limit)
+            self.prepare_training_data(
+                injuries_df, limit, use_cache=use_cache, refresh_cache=refresh_cache,
+            )
         X_train_o, y_train_o, X_train_g, y_train_g = self.train_data
         self.outcome_model.fit(X_train_o, y_train_o)
         self.goals_model.fit(X_train_g, y_train_g)

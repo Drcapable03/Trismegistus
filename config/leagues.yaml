@@ -1,16 +1,76 @@
-# football-data.co.uk season folder (e.g. 2526 = 2025/26)
+# Trismegistus league configuration
+# ---------------------------------
+# max_active_leagues: soft cap — enable only what you need (5 active + room for 3-5 more)
+# To add a league: copy a block below, set code from football-data.co.uk, enabled: true
+# League codes reference: https://www.football-data.co.uk/data.php
+
+max_active_leagues: 10
+
 season: "2526"
 
-leagues:
-  Premier League:
-    code: E0
-  La Liga:
-    code: SP1
-  Bundesliga:
-    code: D1
-  Serie A:
-    code: I1
-  Ligue 1:
-    code: F1
+# Optional extra seasons for deeper history (free CSVs, same source)
+historical_seasons:
+  - "2425"
 
 fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
+
+leagues:
+  # --- Active (Big 5) ---
+  Premier League:
+    code: E0
+    country: ENG
+    enabled: true
+  La Liga:
+    code: SP1
+    country: ESP
+    enabled: true
+  Bundesliga:
+    code: D1
+    country: GER
+    enabled: true
+  Serie A:
+    code: I1
+    country: ITA
+    enabled: true
+  Ligue 1:
+    code: F1
+    country: FRA
+    enabled: true
+
+  # --- Ready to enable (toggle enabled: true) ---
+  Championship:
+    code: E1
+    country: ENG
+    enabled: false
+  League One:
+    code: E2
+    country: ENG
+    enabled: false
+  League Two:
+    code: E3
+    country: ENG
+    enabled: false
+  Eredivisie:
+    code: N1
+    country: NED
+    enabled: false
+  Primeira Liga:
+    code: P1
+    country: POR
+    enabled: false
+  Belgian Pro League:
+    code: B1
+    country: BEL
+    enabled: false
+  Turkish Super Lig:
+    code: T1
+    country: TUR
+    enabled: false
+  Scottish Premiership:
+    code: SC0
+    country: SCO
+    enabled: false
+  Greek Super League:
+    code: G1
+    country: GRE
+    enabled: false

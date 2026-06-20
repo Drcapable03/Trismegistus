@@ -1,7 +1,8 @@
 import pandas as pd
 
+from evaluation.implied_odds import bookie_accuracy
+
 OUTCOME_MAP = {"H": 1, "A": 2, "D": 0}
-ODDS_COL_MAP = {"B365H": 1, "B365A": 2, "B365D": 0}
 
 
 def backtest_predictions(predictions: list[dict], matches: pd.DataFrame | None = None) -> tuple[float, float]:
@@ -17,24 +18,20 @@ def backtest_predictions(predictions: list[dict], matches: pd.DataFrame | None =
 
     accuracy = (pred_df["outcome_code"] == pred_df["actual_code"]).mean() * 100
 
+    bookie_acc = 0.0
     if matches is not None and not matches.empty:
         merged = matches.merge(
-            pred_df, left_on=["HomeTeam", "AwayTeam", "Date"],
-            right_on=["home", "away", "date"], how="inner",
+            pred_df,
+            left_on=["HomeTeam", "AwayTeam", "Date"],
+            right_on=["home", "away", "date"],
+            how="inner",
         )
-        if not merged.empty and {"B365H", "B365A", "B365D"}.issubset(merged.columns):
-            bookie_probs = merged[["B365H", "B365A", "B365D"]].apply(lambda x: 1 / x).fillna(0)
-            bookie_pred = bookie_probs.idxmin(axis=1).map(ODDS_COL_MAP)
-            actual = merged["FTR"].map(OUTCOME_MAP)
-            bookie_accuracy = (actual == bookie_pred).mean() * 100
-        else:
-            bookie_accuracy = 0.0
-    else:
-        bookie_accuracy = 0.0
+        if not merged.empty and {"B365H", "B365A", "B365D", "FTR"}.issubset(merged.columns):
+            bookie_acc = bookie_accuracy(merged)
 
     print(f"Trismegistus Accuracy: {accuracy:.1f}%")
-    print(f"Bookie Accuracy: {bookie_accuracy:.1f}%")
-    return accuracy, bookie_accuracy
+    print(f"Bookie Accuracy (overround-stripped B365): {bookie_acc:.1f}%")
+    return accuracy, bookie_acc
 
 
 def format_prediction(pred: dict) -> str:

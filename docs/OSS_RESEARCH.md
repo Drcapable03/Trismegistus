@@ -1,83 +1,77 @@
 # Open-Source Research for Trismegistus
 
-Last updated: 2026-06-20
+Last updated: 2026-06-20 (expanded)
 
-This document catalogs GitHub/PyPI tools we can adopt to reduce build-from-scratch work.
 Priority: **free/open first**, freemium APIs only where scraping is unreliable.
 
-## Tier 1 — Adopt in Phase 1–2 (High fit)
+## Tier 1 — Adopt now (High fit, actively maintained)
 
-### [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT, PyPI)
-**What:** Production football analytics library — Dixon-Coles/Poisson models, implied odds,
-Elo/Massey/Colley/Pi ratings, Understat/Club Elo scrapers, StatsBomb connector.
+### [soccerdata](https://github.com/probberechts/soccerdata) (Apache-2.0, PyPI) — **1.8k stars, v1.9.0 Apr 2026**
+Unified scrapers with **built-in local cache** for:
+FBref, Understat, WhoScored, Club Elo, ESPN, Football-Data.co.uk, Sofascore, SoFIFA.
 
 **Trismegistus fit:**
-- Replace hand-rolled Poisson + bookie margin math with battle-tested implementations
-- Add implied-probability extraction from our B365 columns (better backtest baseline)
-- Phase 2: Understat xG scraper for richer features
+- Phase 1b/2: Pull xG from Understat, team ratings from Club Elo
+- Multi-source stats without maintaining individual scrapers
+- Caching pattern we mirrored in `utils/chaos_cache.py`
 
-**Integration:** `pip install penaltyblog` — use alongside existing `GameForger`, not as full replacement yet.
-
-### [Scrapling](https://github.com/D4Vinci/Scrapling) (PyPI: `scrapling`)
-**What:** Adaptive Python scraping framework with `StealthyFetcher` (anti-bot bypass),
-adaptive CSS selectors, spider framework, pause/resume crawls.
-
-**Trismegistus fit (Phase 2):**
-- Scrape injury lists from club sites / Premier League when APIs fail
-- Scrape OddsPortal or similar for odds backup when The Odds API quota is exhausted
-- Scrape transfer news pages for Phase 2 gossip/intelligence
-
-**Integration pattern:**
 ```python
-from scrapling.fetchers import StealthyFetcher
-page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
-rows = page.css('.injury-row', adaptive=True)
+import soccerdata as sd
+fbref = sd.FBref("ENG-Premier League", "2526")
+schedule = fbref.read_schedule()
 ```
 
-**Note:** Weather stays on Open-Meteo (free API, no scraping needed). Scrapling is for
-HTML-heavy targets that block plain `requests`.
+### [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT, PyPI) — **v1.11.0 Jun 2026**
+Dixon-Coles/Poisson, implied odds, Elo/Massey/Colley/Pi ratings, Understat scraper, StatsBomb connector.
+
+**Trismegistus fit:** Phase 1b — we implemented basic overround stripping in `evaluation/implied_odds.py`;
+penaltyblog can replace this with Shin method later.
+
+### [Scrapling](https://github.com/D4Vinci/Scrapling) (PyPI: `scrapling`)
+Stealth scraping for injuries, OddsPortal backup, transfer news (Phase 2).
 
 ### [football-data.co.uk](https://www.football-data.co.uk) (free CSV)
-Already integrated. Expand to multi-league via season codes in `config/leagues.yaml`.
+Primary ingest — now supports multi-season + 10 league slots in `config/leagues.yaml`.
 
-## Tier 2 — Phase 2 Enrichment
+## Tier 2 — Historical stats & enrichment
+
+### [worldfootballr](https://github.com/jaseziv/worldfootballr) (R, API wrappers)
+FBref, Transfermarkr, Understat access. Reference for feature ideas; Python equivalent is `soccerdata`.
 
 ### [StatsBomb Open Data](https://github.com/statsbomb/open-data) (free)
-Event-level xG for select competitions. penaltyblog has a connector. Use for feature depth,
-not as primary league coverage.
+Event-level xG. penaltyblog/soccerdata both connect.
+
+### [openfootball/football.json](https://github.com/openfootball/football.json)
+Free JSON leagues/cups worldwide. Good for fixture metadata, not odds.
 
 ### [OddsHarvester](https://github.com/jordantete/OddsHarvester)
-Scrapes odds from multiple bookmakers. Good Scrapling alternative reference; evaluate
-license and maintenance before adopting.
+Multi-bookmaker odds scraper — free alternative to The Odds API.
 
 ### [soccerapi](https://github.com/S1M0N38/soccerapi)
-API wrappers for soccerway, betexplorer, whoscored. Useful if we need fixture metadata
-beyond football-data.co.uk.
+Wrappers for Soccerway, BetExplorer, WhoScored.
 
 ### [gingeleski/odds-portal-scraper](https://github.com/gingeleski/odds-portal-scraper)
-OddsPortal historical odds. Pair with Scrapling if OddsPortal changes layout.
+Historical OddsPortal odds.
 
-## Tier 3 — Reference / Patterns Only
+## Tier 3 — Reference only
 
 | Project | Use |
 |---------|-----|
-| [eddwebster/football_analytics](https://github.com/eddwebster/football_analytics) | EDA and modelling notebooks |
-| [ProphitBet-Soccer-Bets-Predictor](https://github.com/kochlisGit/ProphitBet-Soccer-Bets-Predictor) | GUI betting predictor patterns |
-| [kochlisGit/...](https://github.com/kochlisGit/ProphitBet-Soccer-Bets-Predictor) | Feature engineering ideas |
+| [eddwebster/football_analytics](https://github.com/eddwebster/football_analytics) | EDA notebooks |
+| [ProphitBet-Soccer-Bets-Predictor](https://github.com/kochlisGit/ProphitBet-Soccer-Bets-Predictor) | GUI patterns |
 
-## Recommended Integration Roadmap
+## Integration roadmap (updated)
 
-| Phase | OSS Tool | Task |
-|-------|----------|------|
-| 1 | penaltyblog (implied odds) | Better bookie baseline in `evaluation/backtest` |
-| 1 | — | Fix pipeline with existing stack first |
-| 2 | Scrapling | Injury + news + odds fallback scrapers |
-| 2 | penaltyblog (scrapers) | Understat xG, Club Elo ratings |
-| 2 | StatsBomb open | xG features for supported leagues |
-| 3 | FastAPI (standard) | Web platform |
+| Phase | Tool | Status |
+|-------|------|--------|
+| 1 | football-data.co.uk | Done |
+| 1b | chaos cache, implied odds, model persistence | Done |
+| 1b | expandable leagues config | Done |
+| 2 | soccerdata (Understat xG, Club Elo) | Next |
+| 2 | Scrapling (injuries, live odds scrape) | Planned |
+| 2 | penaltyblog (Shin implied odds) | Optional upgrade |
+| 3 | FastAPI platform | Planned |
 
-## What NOT to adopt (yet)
+## Cost summary
 
-- LLM agent frameworks for predictions — noisy and costly for H/D/A
-- Full replacement of GameForger with penaltyblog models — validate via backtest first
-- PostgreSQL — SQLite sufficient until Phase 3 multi-user
+See [API_COSTS.md](API_COSTS.md) — **$0/month is viable** for backtesting and learning.
