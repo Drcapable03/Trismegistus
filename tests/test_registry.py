@@ -5,7 +5,7 @@ from config.settings import MODELS_DIR
 
 def test_registry_roundtrip_blend_and_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr("predictors.registry.MODELS_DIR", tmp_path)
-    forger = GameForger(bookie_blend_weight=0.25)
+    forger = GameForger(bookie_blend_weight=0.25, edge_margin=0.08)
     forger.training_metadata = {"split_method": "walk_forward", "test_matches": 10}
     forger.outcome_features = ["a"]
     forger.goals_features = ["b"]
@@ -14,4 +14,5 @@ def test_registry_roundtrip_blend_and_metadata(tmp_path, monkeypatch):
     loaded = GameForger()
     load_game_forger(loaded, path)
     assert loaded.bookie_blend_weight == 0.25
+    assert loaded.edge_margin == 0.08
     assert loaded.training_metadata["test_matches"] == 10

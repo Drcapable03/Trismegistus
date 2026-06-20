@@ -16,7 +16,9 @@ fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
 
 # Tuned on league holdout via scripts/tune_blend.py (override with BOOKIE_BLEND_WEIGHT env)
 model:
-  bookie_blend_weight: 0.0
+  bookie_blend_weight: 0.1
+  # Min edge vs bookie implied prob to emit a pick (Phase 2 selective betting)
+  edge_margin_min: 0.05
 
 leagues:
   # --- Active (Big 5) ---

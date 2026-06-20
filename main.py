@@ -4,7 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from config.settings import (
-    enabled_leagues,
+    edge_margin_min,
     fixtures_url,
     league_div_codes,
     league_summary,
@@ -68,10 +68,20 @@ def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool =
         chaos_cache_only=not refresh_cache,
     )
     forger.evaluate_holdout()
-    predictions = forger.backtest_on_holdout(confidence_threshold=0.0)
+    margin = edge_margin_min()
+    all_preds = forger.backtest_on_holdout(
+        confidence_threshold=0.0, require_edge=False, edge_margin=0.0,
+    )
+    selective_preds = forger.backtest_on_holdout(
+        confidence_threshold=0.0, require_edge=True, edge_margin=margin,
+    )
     matches = read_matches()
     matches = _apply_div_filter(matches, div_codes)
-    backtest_predictions(predictions, matches)
+    backtest_predictions(
+        all_preds, matches,
+        selective_predictions=selective_preds,
+        edge_margin=margin,
+    )
     meta = forger.training_metadata
     if meta:
         print(
@@ -95,6 +105,7 @@ def run_predict(
     use_cache: bool = True,
     refresh_cache: bool = False,
     model_path: str | None = None,
+    edge_margin: float | None = None,
 ) -> None:
     div_codes = league_div_codes()
     matches = read_matches()
@@ -127,7 +138,13 @@ def run_predict(
         div_filter=div_codes,
         chaos_cache_only=False,
     )
-    predictions = forger.predict(confidence_threshold=confidence)
+    margin = edge_margin if edge_margin is not None else edge_margin_min()
+    print(f"Edge filter: only picks with ≥{margin:.0%} edge vs bookie implied")
+    predictions = forger.predict(
+        confidence_threshold=confidence,
+        edge_margin=margin,
+        use_simulation=False,
+    )
     print("\nPredictions:")
     for pred in predictions:
         print(format_prediction(pred))
@@ -151,6 +168,10 @@ def main():
     parser.add_argument("--explore", action="store_true", help="Print data summary")
     parser.add_argument("--reset", action="store_true", help="Drop and recreate matches table before ingest")
     parser.add_argument("--confidence", type=float, default=75.0, help="Min confidence %% for predictions")
+    parser.add_argument(
+        "--edge-margin", type=float, default=None,
+        help="Min edge vs bookie implied prob to emit a pick (default from leagues.yaml)",
+    )
     parser.add_argument("--limit", type=int, default=200, help="Max completed matches for training")
     parser.add_argument("--save-model", action="store_true", help="Save trained model after backtest")
     parser.add_argument("--load-model", type=str, default=None, help="Path to saved model for --predict")
@@ -193,6 +214,7 @@ def main():
             use_cache=use_cache,
             refresh_cache=args.refresh_cache,
             model_path=args.load_model,
+            edge_margin=args.edge_margin,
         )
     if args.worldcup_scrape:
         from scripts.worldcup_pipeline import test_scrape_sample

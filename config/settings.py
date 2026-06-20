@@ -68,6 +68,37 @@ def league_div_codes() -> list[str]:
     return [info["code"] for info in enabled_leagues().values()]
 
 
+def edge_margin_min() -> float:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    if model_cfg.get("edge_margin_min") is not None:
+        return float(model_cfg["edge_margin_min"])
+    return float(get_env("EDGE_MARGIN_MIN", "0.05"))
+
+
+def set_edge_margin_min(margin: float) -> None:
+    import re
+
+    config_path = ROOT / "config" / "leagues.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    value = round(float(margin), 3)
+    if re.search(r"^\s*edge_margin_min:\s*[\d.]+", text, re.MULTILINE):
+        text = re.sub(
+            r"^(\s*edge_margin_min:\s*)[\d.]+",
+            rf"\g<1>{value}",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        text = text.replace(
+            "bookie_blend_weight:",
+            f"edge_margin_min: {value}\n  bookie_blend_weight:",
+            1,
+        )
+    config_path.write_text(text, encoding="utf-8")
+
+
 def bookie_blend_weight() -> float:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}

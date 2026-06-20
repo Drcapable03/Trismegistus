@@ -5,6 +5,13 @@ from sklearn.linear_model import PoissonRegressor
 from sqlalchemy import inspect
 
 from config.settings import bookie_blend_weight as default_bookie_blend_weight
+from config.settings import edge_margin_min as default_edge_margin
+from evaluation.edge import (
+    best_outcome_and_edge,
+    implied_probs_array,
+    passes_edge_filter,
+    selective_accuracy,
+)
 from evaluation.implied_odds import bookie_favorite, implied_probs_from_odds
 from utils.db import engine
 from utils.pit_features import compute_pit_form_and_h2h
@@ -32,6 +39,7 @@ def _date_str_col(df: pd.DataFrame) -> pd.Series:
 
 
 def _add_implied_odds_features(data: pd.DataFrame) -> pd.DataFrame:
+    """Bookie implied probs — used at inference only, not model features."""
     data = data.copy()
     implied = data.apply(
         lambda r: implied_probs_from_odds(
@@ -43,6 +51,13 @@ def _add_implied_odds_features(data: pd.DataFrame) -> pd.DataFrame:
     data["implied_prob_H"] = [p[1] for p in implied]
     data["implied_prob_A"] = [p[2] for p in implied]
     return data
+
+
+def _add_div_features(data: pd.DataFrame) -> pd.DataFrame:
+    if "Div" not in data.columns:
+        return data
+    dummies = pd.get_dummies(data["Div"], prefix="div", dtype=float)
+    return pd.concat([data, dummies], axis=1)
 
 
 def _apply_div_filter(matches: pd.DataFrame, div_filter: str | list[str] | None) -> pd.DataFrame:
@@ -77,6 +92,7 @@ def _merge_features(
         cache_only=chaos_cache_only,
     )
     data = data.merge(chaos, on=["HomeTeam", "AwayTeam", "Date"], how="left")
+    data = _add_div_features(data)
     return _add_implied_odds_features(data)
 
 
@@ -104,7 +120,6 @@ def _walk_forward_split(
     y_goals: pd.Series,
     test_fraction: float = DEFAULT_TEST_FRACTION,
 ) -> tuple:
-    """Chronological train/test split — shared indices for outcome and goals."""
     ordered = _sort_chronologically(data)
     n_test = max(1, int(len(ordered) * test_fraction))
     train_idx = ordered.index[:-n_test]
@@ -120,11 +135,21 @@ def _walk_forward_split(
 
 
 class GameForger:
-    def __init__(self, sim_runs: int = 1000, bookie_blend_weight: float | None = None):
+    """Residual edge model: learns from form/chaos/league; bookie used only at inference."""
+
+    def __init__(
+        self,
+        sim_runs: int = 1000,
+        bookie_blend_weight: float | None = None,
+        edge_margin: float | None = None,
+    ):
         self.bookie_blend_weight = (
             default_bookie_blend_weight()
             if bookie_blend_weight is None
             else float(bookie_blend_weight)
+        )
+        self.edge_margin = (
+            default_edge_margin() if edge_margin is None else float(edge_margin)
         )
         self.outcome_model = GradientBoostingClassifier(
             n_estimators=150, learning_rate=0.01, max_depth=3,
@@ -140,18 +165,26 @@ class GameForger:
         self.prediction_data = None
         self.training_metadata: dict = {}
 
-    def _feature_columns(self, data: pd.DataFrame) -> tuple[list[str], list[str]]:
+    def _div_columns(self, data: pd.DataFrame) -> list[str]:
+        return sorted(c for c in data.columns if c.startswith("div_"))
+
+    def _model_feature_columns(self, data: pd.DataFrame) -> tuple[list[str], list[str]]:
+        """Residual features — no raw bookie odds in the learner."""
         outcome_cols = [
-            "B365H", "B365A", "B365D",
-            "implied_prob_H", "implied_prob_D", "implied_prob_A",
             "home_x_sentiment", "away_x_sentiment",
-            "rain", "wind", "odds_H", "odds_A", "odds_D",
+            "home_injuries", "away_injuries",
+            "rain", "wind",
             "h2h_home_win_pct", "h2h_avg_home_goals", "h2h_avg_away_goals",
             "avg_goals_scored_home", "avg_goals_scored_away",
+            "avg_goals_conceded_home", "avg_goals_conceded_away",
+            *self._div_columns(data),
         ]
         goals_cols = [
-            "rain", "wind", "h2h_avg_home_goals", "h2h_avg_away_goals",
+            "rain", "wind",
+            "h2h_avg_home_goals", "h2h_avg_away_goals",
             "avg_goals_scored_home", "avg_goals_scored_away",
+            "avg_goals_conceded_home", "avg_goals_conceded_away",
+            *self._div_columns(data),
         ]
         return outcome_cols, goals_cols
 
@@ -184,7 +217,7 @@ class GameForger:
             chaos_cache_only=chaos_cache_only,
         ).reset_index(drop=True)
         completed_dates = completed["Date"].copy()
-        outcome_cols, goals_cols = self._feature_columns(data)
+        outcome_cols, goals_cols = self._model_feature_columns(data)
 
         X_outcome = data[outcome_cols].fillna(0)
         y_outcome = data["FTR"].map(OUTCOME_MAP)
@@ -203,7 +236,7 @@ class GameForger:
         ) = _walk_forward_split(data, X_outcome, y_outcome, X_goals, y_goals, test_fraction)
 
         context_cols = ["HomeTeam", "AwayTeam", "Date", "odds_error", "FTR"]
-        for col in ("B365H", "B365D", "B365A"):
+        for col in ("B365H", "B365D", "B365A", "Div"):
             if col in data.columns:
                 context_cols.append(col)
         test_context = data.loc[test_idx, context_cols].copy()
@@ -216,6 +249,7 @@ class GameForger:
         train_dates = completed_dates.loc[train_idx]
         test_dates = completed_dates.loc[test_idx]
         self.training_metadata = {
+            "model_type": "residual_edge",
             "div_filter": div_filter,
             "split_method": "walk_forward",
             "test_fraction": test_fraction,
@@ -227,13 +261,16 @@ class GameForger:
             "test_date_to": str(test_dates.max().date()) if len(test_dates) else None,
             "chaos_cache_only": chaos_cache_only,
             "bookie_blend_weight": self.bookie_blend_weight,
+            "edge_margin_min": self.edge_margin,
+            "outcome_features": self.outcome_features,
         }
 
         scope = f" ({div_filter})" if div_filter else ""
         print(
-            f"Prepared training data: {len(completed)} matches{scope}, "
-            f"walk-forward split {len(train_idx)} train / {len(test_idx)} test"
+            f"Prepared residual training data: {len(completed)} matches{scope}, "
+            f"walk-forward {len(train_idx)} train / {len(test_idx)} test"
         )
+        print(f"  Model features ({len(outcome_cols)}): no bookie odds in learner")
         print(
             f"  Train: {self.training_metadata['train_date_from']} → "
             f"{self.training_metadata['train_date_to']}"
@@ -264,9 +301,9 @@ class GameForger:
             div_filter=div_filter,
             chaos_cache_only=chaos_cache_only,
         )
-        outcome_cols, goals_cols = self._feature_columns(data)
+        outcome_cols, goals_cols = self._model_feature_columns(data)
         context_cols = ["HomeTeam", "AwayTeam", "Date"]
-        for col in ("B365H", "B365D", "B365A"):
+        for col in ("B365H", "B365D", "B365A", "Div"):
             if col in data.columns:
                 context_cols.append(col)
         self.prediction_data = {
@@ -299,19 +336,11 @@ class GameForger:
         self.goals_model.fit(X_train_g, y_train_g)
         raw_preds = self.outcome_model.predict(X_train_o)
         raw_accuracy = (raw_preds == y_train_o).mean() * 100
-        print(f"Raw Model Accuracy (train): {raw_accuracy:.1f}%")
+        print(f"Residual model train accuracy: {raw_accuracy:.1f}%")
 
-    def evaluate_holdout(self) -> float:
-        if self.test_data is None:
-            raise ValueError("Run prepare_training_data() first")
-        model_acc = self.holdout_blend_accuracy(blend_weight=0.0)
-        blend_acc = self.holdout_blend_accuracy()
-        print(f"Holdout accuracy (model only, deterministic): {model_acc:.1f}%")
-        print(
-            f"Holdout accuracy (blend w={self.bookie_blend_weight:.2f}, deterministic): "
-            f"{blend_acc:.1f}%"
-        )
-        return blend_acc
+    def _raw_model_probs(self, outcome_features) -> np.ndarray:
+        outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
+        return self.outcome_model.predict_proba(outcome_df)[0]
 
     def _blend_with_bookie(
         self,
@@ -321,13 +350,11 @@ class GameForger:
     ) -> np.ndarray:
         if b365 is None:
             return model_probs
-        h, d, a = b365
-        if min(h, d, a) <= 0:
+        implied = implied_probs_array(b365)
+        if implied is None:
             return model_probs
-        p_d, p_h, p_a = implied_probs_from_odds(h, d, a)
-        bookie = np.array([p_d, p_h, p_a], dtype=float)
         w = self.bookie_blend_weight if blend_weight is None else float(blend_weight)
-        blended = (1 - w) * model_probs + w * bookie
+        blended = (1 - w) * model_probs + w * implied
         total = blended.sum()
         return blended / total if total > 0 else model_probs
 
@@ -336,27 +363,81 @@ class GameForger:
         outcome_features,
         b365: tuple[float, float, float] | None = None,
         blend_weight: float | None = None,
-    ) -> np.ndarray:
-        outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
-        model_probs = self.outcome_model.predict_proba(outcome_df)[0]
-        return self._blend_with_bookie(model_probs, b365, blend_weight=blend_weight)
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+        """Return (final_probs, model_probs, implied_probs)."""
+        model_probs = self._raw_model_probs(outcome_features)
+        implied = implied_probs_array(b365)
+        final = self._blend_with_bookie(model_probs, b365, blend_weight=blend_weight)
+        return final, model_probs, implied
 
-    def holdout_blend_accuracy(self, blend_weight: float | None = None) -> float:
-        """Deterministic holdout accuracy at a given bookie blend weight."""
+    def _evaluate_row(
+        self,
+        outcome_features,
+        b365: tuple[float, float, float] | None,
+        blend_weight: float | None,
+        edge_margin: float,
+        require_edge: bool,
+    ) -> tuple[int, float, float, np.ndarray] | None:
+        final, _, implied = self.predict_outcome_probs(
+            outcome_features, b365=b365, blend_weight=blend_weight,
+        )
+        if implied is None:
+            pred = int(np.argmax(final))
+            edge = 0.0
+        else:
+            pred, edge = best_outcome_and_edge(final, implied)
+        if require_edge and implied is not None and not passes_edge_filter(edge, edge_margin):
+            return None
+        confidence = float(np.max(final) * 100)
+        return pred, confidence, edge, final
+
+    def holdout_blend_accuracy(
+        self,
+        blend_weight: float | None = None,
+        edge_margin: float | None = None,
+        require_edge: bool = False,
+    ) -> float:
         if self.test_data is None or self.context is None:
             raise ValueError("Run train() first")
+        margin = self.edge_margin if edge_margin is None else edge_margin
         X_test_o, y_test_o, _, _ = self.test_data
         correct = 0
+        total = 0
         for i in range(len(X_test_o)):
             row = self.context.iloc[i]
-            b365 = _b365_from_row(row)
-            probs = self.predict_outcome_probs(
-                X_test_o.iloc[i], b365=b365, blend_weight=blend_weight,
+            evaluated = self._evaluate_row(
+                X_test_o.iloc[i],
+                _b365_from_row(row),
+                blend_weight,
+                margin,
+                require_edge,
             )
-            pred = int(np.argmax(probs))
+            if evaluated is None:
+                continue
+            pred, _, _, _ = evaluated
+            total += 1
             if pred == int(y_test_o.iloc[i]):
                 correct += 1
-        return correct / len(X_test_o) * 100 if len(X_test_o) else 0.0
+        return correct / total * 100 if total else 0.0
+
+    def evaluate_holdout(self) -> float:
+        if self.test_data is None:
+            raise ValueError("Run prepare_training_data() first")
+        model_acc = self.holdout_blend_accuracy(blend_weight=0.0)
+        blend_acc = self.holdout_blend_accuracy()
+        selective_acc = self.holdout_blend_accuracy(require_edge=True)
+        n_selective = len(self.backtest_on_holdout(edge_margin=self.edge_margin))
+        n_all = len(self.test_data[1])
+
+        print(f"Holdout — residual model only (w=0): {model_acc:.1f}%")
+        print(
+            f"Holdout — blend w={self.bookie_blend_weight:.2f} (all picks): {blend_acc:.1f}%"
+        )
+        print(
+            f"Holdout — selective edge ≥{self.edge_margin:.0%}: "
+            f"{selective_acc:.1f}% on {n_selective}/{n_all} matches"
+        )
+        return blend_acc
 
     def simulate_match(
         self,
@@ -366,15 +447,23 @@ class GameForger:
         blend_weight: float | None = None,
     ):
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
-        probs = self.predict_outcome_probs(outcome_features, b365=b365, blend_weight=blend_weight)
-        outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=probs)
+        final, _, _ = self.predict_outcome_probs(
+            outcome_features, b365=b365, blend_weight=blend_weight,
+        )
+        outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=final)
         goals_pred = self.goals_model.predict(goals_df)[0]
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
-        return outcomes, goals, probs
+        return outcomes, goals, final
 
-    def predict(self, confidence_threshold: float = 75.0, use_simulation: bool = True) -> list[dict]:
+    def predict(
+        self,
+        confidence_threshold: float = 75.0,
+        edge_margin: float | None = None,
+        use_simulation: bool = False,
+    ) -> list[dict]:
         if self.prediction_data is None:
             raise ValueError("Run prepare_prediction_data() with future matches first")
+        margin = self.edge_margin if edge_margin is None else edge_margin
         results = []
         X_outcome = self.prediction_data["X_outcome"]
         X_goals = self.prediction_data["X_goals"]
@@ -385,52 +474,70 @@ class GameForger:
             b365 = _b365_from_row(row)
             goals_df = pd.DataFrame([X_goals.iloc[i]], columns=self.goals_features)
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
-            probs = self.predict_outcome_probs(X_outcome.iloc[i], b365=b365)
+
+            evaluated = self._evaluate_row(
+                X_outcome.iloc[i], b365, None, margin, require_edge=True,
+            )
+            if evaluated is None:
+                continue
+            pred, confidence, edge, final = evaluated
+
+            if confidence < confidence_threshold:
+                continue
 
             if use_simulation:
-                outcomes, goals, probs = self.simulate_match(
+                outcomes, goals, final = self.simulate_match(
                     X_outcome.iloc[i], X_goals.iloc[i], b365=b365,
                 )
                 pred = int(np.bincount(outcomes).argmax())
                 confidence = float(np.mean(outcomes == pred) * 100)
                 total_goals = max(0, round(float(np.mean(goals))))
             else:
-                pred = int(np.argmax(probs))
-                confidence = float(np.max(probs) * 100)
                 total_goals = max(0, round(expected_goals))
 
-            if confidence >= confidence_threshold:
-                bookie_pick = None
-                if b365 is not None:
-                    bookie_code = bookie_favorite(*b365)
-                    bookie_pick = OUTCOME_LABELS[bookie_code]
-                results.append({
-                    "home": row["HomeTeam"],
-                    "away": row["AwayTeam"],
-                    "date": row["Date"],
-                    "outcome": OUTCOME_LABELS[pred],
-                    "outcome_code": pred,
-                    "confidence": confidence,
-                    "expected_goals": expected_goals,
-                    "total_goals": total_goals,
-                    "probs": {"H": float(probs[1]), "D": float(probs[0]), "A": float(probs[2])},
-                    "bookie_pick": bookie_pick,
-                })
-        print(f"Filtered {len(results)} predictions with confidence >= {confidence_threshold}%")
+            bookie_pick = None
+            if b365 is not None:
+                bookie_pick = OUTCOME_LABELS[bookie_favorite(*b365)]
+
+            results.append({
+                "home": row["HomeTeam"],
+                "away": row["AwayTeam"],
+                "date": row["Date"],
+                "outcome": OUTCOME_LABELS[pred],
+                "outcome_code": pred,
+                "confidence": confidence,
+                "edge": edge,
+                "expected_goals": expected_goals,
+                "total_goals": total_goals,
+                "probs": {"H": float(final[1]), "D": float(final[0]), "A": float(final[2])},
+                "bookie_pick": bookie_pick,
+            })
+        print(
+            f"Edge-filtered picks: {len(results)} "
+            f"(margin ≥{margin:.0%}, confidence ≥{confidence_threshold}%)"
+        )
         return results
 
-    def backtest_on_holdout(self, confidence_threshold: float = 0.0) -> list[dict]:
-        """Deterministic predictions on chronological holdout test set."""
+    def backtest_on_holdout(
+        self,
+        confidence_threshold: float = 0.0,
+        edge_margin: float | None = None,
+        require_edge: bool = True,
+    ) -> list[dict]:
         if self.test_data is None or self.context is None:
             raise ValueError("Run train() first")
+        margin = self.edge_margin if edge_margin is None else edge_margin
         X_test_o, y_test_o, X_test_g, _ = self.test_data
         results = []
         for i in range(len(X_test_o)):
             row = self.context.iloc[i]
             b365 = _b365_from_row(row)
-            probs = self.predict_outcome_probs(X_test_o.iloc[i], b365=b365)
-            pred = int(np.argmax(probs))
-            confidence = float(np.max(probs) * 100)
+            evaluated = self._evaluate_row(
+                X_test_o.iloc[i], b365, None, margin, require_edge,
+            )
+            if evaluated is None:
+                continue
+            pred, confidence, edge, final = evaluated
             if confidence < confidence_threshold:
                 continue
             goals_df = pd.DataFrame([X_test_g.iloc[i]], columns=self.goals_features)
@@ -444,9 +551,10 @@ class GameForger:
                 "outcome_code": pred,
                 "actual_code": actual,
                 "confidence": confidence,
+                "edge": edge,
                 "expected_goals": expected_goals,
                 "total_goals": max(0, round(expected_goals)),
                 "odds_error": bool(row.get("odds_error", False)),
-                "probs": {"H": float(probs[1]), "D": float(probs[0]), "A": float(probs[2])},
+                "probs": {"H": float(final[1]), "D": float(final[0]), "A": float(final[2])},
             })
         return results
