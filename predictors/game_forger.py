@@ -5,6 +5,7 @@ from sklearn.linear_model import PoissonRegressor
 from sklearn.model_selection import train_test_split
 from sqlalchemy import inspect
 
+from config.settings import bookie_blend_weight as default_bookie_blend_weight
 from evaluation.implied_odds import bookie_favorite, implied_probs_from_odds
 from utils.db import engine
 from scripts.fetch_chaos import get_chaos_data
@@ -17,10 +18,6 @@ H2H_DEFAULTS = {
     "h2h_avg_home_goals": 1.35,
     "h2h_avg_away_goals": 1.15,
 }
-# When B365 odds exist, lean on market implied probs (helps sparse WC / early-season runs).
-BOOKIE_BLEND_WEIGHT = 0.55
-
-
 def _parse_dates(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"], format="%d/%m/%Y", errors="coerce")
@@ -99,8 +96,22 @@ def _merge_features(
     return _add_implied_odds_features(data)
 
 
+def _b365_from_row(row: pd.Series) -> tuple[float, float, float] | None:
+    if not {"B365H", "B365D", "B365A"}.issubset(row.index):
+        return None
+    h, d, a = row["B365H"], row["B365D"], row["B365A"]
+    if pd.isna(h) or pd.isna(d) or pd.isna(a) or min(h, d, a) <= 0:
+        return None
+    return float(h), float(d), float(a)
+
+
 class GameForger:
-    def __init__(self, sim_runs: int = 1000):
+    def __init__(self, sim_runs: int = 1000, bookie_blend_weight: float | None = None):
+        self.bookie_blend_weight = (
+            default_bookie_blend_weight()
+            if bookie_blend_weight is None
+            else float(bookie_blend_weight)
+        )
         self.outcome_model = GradientBoostingClassifier(
             n_estimators=150, learning_rate=0.01, max_depth=3,
             min_samples_split=20, min_samples_leaf=10, random_state=42,
@@ -172,7 +183,11 @@ class GameForger:
         X_train_g, X_test_g, y_train_g, y_test_g = train_test_split(
             X_goals, y_goals, test_size=0.2, random_state=42,
         )
-        test_context = data.loc[X_test_o.index, ["HomeTeam", "AwayTeam", "Date", "odds_error", "FTR"]]
+        context_cols = ["HomeTeam", "AwayTeam", "Date", "odds_error", "FTR"]
+        for col in ("B365H", "B365D", "B365A"):
+            if col in data.columns:
+                context_cols.append(col)
+        test_context = data.loc[X_test_o.index, context_cols]
 
         self.train_data = (X_train_o, y_train_o, X_train_g, y_train_g)
         self.test_data = (X_test_o, y_test_o, X_test_g, y_test_g)
@@ -247,6 +262,7 @@ class GameForger:
         self,
         model_probs: np.ndarray,
         b365: tuple[float, float, float] | None,
+        blend_weight: float | None = None,
     ) -> np.ndarray:
         if b365 is None:
             return model_probs
@@ -255,15 +271,47 @@ class GameForger:
             return model_probs
         p_d, p_h, p_a = implied_probs_from_odds(h, d, a)
         bookie = np.array([p_d, p_h, p_a], dtype=float)
-        w = BOOKIE_BLEND_WEIGHT
+        w = self.bookie_blend_weight if blend_weight is None else float(blend_weight)
         blended = (1 - w) * model_probs + w * bookie
         total = blended.sum()
         return blended / total if total > 0 else model_probs
 
-    def simulate_match(self, outcome_features, goals_features, b365: tuple[float, float, float] | None = None):
+    def predict_outcome_probs(
+        self,
+        outcome_features,
+        b365: tuple[float, float, float] | None = None,
+        blend_weight: float | None = None,
+    ) -> np.ndarray:
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
+        model_probs = self.outcome_model.predict_proba(outcome_df)[0]
+        return self._blend_with_bookie(model_probs, b365, blend_weight=blend_weight)
+
+    def holdout_blend_accuracy(self, blend_weight: float | None = None) -> float:
+        """Deterministic holdout accuracy at a given bookie blend weight."""
+        if self.test_data is None or self.context is None:
+            raise ValueError("Run train() first")
+        X_test_o, y_test_o, _, _ = self.test_data
+        correct = 0
+        for i in range(len(X_test_o)):
+            row = self.context.iloc[i]
+            b365 = _b365_from_row(row)
+            probs = self.predict_outcome_probs(
+                X_test_o.iloc[i], b365=b365, blend_weight=blend_weight,
+            )
+            pred = int(np.argmax(probs))
+            if pred == int(y_test_o.iloc[i]):
+                correct += 1
+        return correct / len(X_test_o) * 100 if len(X_test_o) else 0.0
+
+    def simulate_match(
+        self,
+        outcome_features,
+        goals_features,
+        b365: tuple[float, float, float] | None = None,
+        blend_weight: float | None = None,
+    ):
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
-        probs = self._blend_with_bookie(self.outcome_model.predict_proba(outcome_df)[0], b365)
+        probs = self.predict_outcome_probs(outcome_features, b365=b365, blend_weight=blend_weight)
         outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=probs)
         goals_pred = self.goals_model.predict(goals_df)[0]
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
@@ -282,11 +330,7 @@ class GameForger:
             away = context.iloc[i]["AwayTeam"]
             date = context.iloc[i]["Date"]
             row = context.iloc[i]
-            b365 = None
-            if {"B365H", "B365D", "B365A"}.issubset(row.index):
-                h, d, a = row["B365H"], row["B365D"], row["B365A"]
-                if pd.notna(h) and pd.notna(d) and pd.notna(a) and min(h, d, a) > 0:
-                    b365 = (float(h), float(d), float(a))
+            b365 = _b365_from_row(row)
             outcomes, goals, probs = self.simulate_match(
                 X_outcome.iloc[i], X_goals.iloc[i], b365=b365,
             )
@@ -323,7 +367,11 @@ class GameForger:
         X_test_o, y_test_o, X_test_g, _ = self.test_data
         results = []
         for i in range(len(X_test_o)):
-            outcomes, goals, probs = self.simulate_match(X_test_o.iloc[i], X_test_g.iloc[i])
+            row = self.context.iloc[i]
+            b365 = _b365_from_row(row)
+            outcomes, goals, probs = self.simulate_match(
+                X_test_o.iloc[i], X_test_g.iloc[i], b365=b365,
+            )
             pred = int(np.bincount(outcomes).argmax())
             confidence = float(np.mean(outcomes == pred) * 100)
             if confidence < confidence_threshold:

@@ -16,6 +16,8 @@ from utils.db import load_csv_to_db, read_matches
 from utils.features import calculate_team_form
 
 WC_DIV = "WC26"
+# Sparse WC sample — lean on bookie more than league-tuned default (0.0).
+WC_BOOKIE_BLEND_WEIGHT = 0.55
 
 
 def ingest_worldcup(df: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -78,7 +80,7 @@ def predict_worldcup(confidence: float = 60.0, max_upcoming: int = 5) -> None:
         f"Training on {len(completed)} completed WC26 matches "
         f"(not mixing with league data)"
     )
-    forger = GameForger()
+    forger = GameForger(bookie_blend_weight=WC_BOOKIE_BLEND_WEIGHT)
     forger.train(
         limit=len(completed),
         use_cache=True,

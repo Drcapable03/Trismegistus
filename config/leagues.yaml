@@ -14,6 +14,10 @@ historical_seasons:
 
 fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
 
+# Tuned on league holdout via scripts/tune_blend.py (override with BOOKIE_BLEND_WEIGHT env)
+model:
+  bookie_blend_weight: 0.0
+
 leagues:
   # --- Active (Big 5) ---
   Premier League:

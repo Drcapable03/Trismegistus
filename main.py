@@ -3,7 +3,14 @@ import argparse
 import pandas as pd
 from dotenv import load_dotenv
 
-from config.settings import enabled_leagues, fixtures_url, league_summary, league_urls, today
+from config.settings import (
+    enabled_leagues,
+    fixtures_url,
+    league_div_codes,
+    league_summary,
+    league_urls,
+    today,
+)
 from predictors.blunder_sniffer import BlunderSniffer
 from predictors.game_forger import GameForger, _is_completed, _parse_dates
 from predictors.registry import latest_model_path, load_game_forger, save_game_forger
@@ -35,8 +42,7 @@ def ingest_data(reset: bool = False) -> None:
 
     csv_path = scrape_matches(fixtures_url(), "Fixtures")
     load_csv_to_db(csv_path, "matches")
-    league_codes = [info["code"] for info in enabled_leagues().values()]
-    calculate_team_form(div_filter=league_codes)
+    calculate_team_form(div_filter=league_div_codes())
     print("Ingest complete.")
 
 
@@ -48,12 +54,15 @@ def get_future_matches(matches: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool = False) -> GameForger:
+    div_codes = league_div_codes()
+    print(f"Backtest scope: Big 5 leagues {div_codes}")
     forger = GameForger()
     forger.train(
         injuries_df=DEFAULT_INJURIES,
         limit=limit,
         use_cache=use_cache,
         refresh_cache=refresh_cache,
+        div_filter=div_codes,
     )
     forger.evaluate_holdout()
     predictions = forger.backtest_on_holdout(confidence_threshold=0.0)
@@ -134,12 +143,14 @@ def main():
     parser.add_argument("--worldcup-scrape", action="store_true", help="Test Scrapling World Cup scrape")
     parser.add_argument("--worldcup-ingest", action="store_true", help="Scrape and ingest World Cup matches")
     parser.add_argument("--worldcup-predict", action="store_true", help="Predict upcoming World Cup fixtures")
+    parser.add_argument("--tune-blend", action="store_true", help="Grid-search bookie blend weight on league holdout")
     args = parser.parse_args()
 
     use_cache = not args.no_cache
     run_all = not any([
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
+        args.tune_blend,
     ])
 
     print("Trismegistus is alive!")
@@ -176,6 +187,9 @@ def main():
     if args.worldcup_predict:
         from scripts.worldcup_pipeline import predict_worldcup
         predict_worldcup(confidence=args.confidence)
+    if args.tune_blend:
+        from scripts.tune_blend import tune_blend
+        tune_blend(limit=args.limit, use_cache=use_cache)
     print("Done.")
 
 

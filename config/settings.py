@@ -64,6 +64,42 @@ def fixtures_url() -> str:
     return load_leagues_config()["fixtures_url"]
 
 
+def league_div_codes() -> list[str]:
+    return [info["code"] for info in enabled_leagues().values()]
+
+
+def bookie_blend_weight() -> float:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    if model_cfg.get("bookie_blend_weight") is not None:
+        return float(model_cfg["bookie_blend_weight"])
+    return float(get_env("BOOKIE_BLEND_WEIGHT", "0.55"))
+
+
+def set_bookie_blend_weight(weight: float) -> None:
+    """Persist tuned blend weight to config/leagues.yaml without rewriting the file."""
+    import re
+
+    config_path = ROOT / "config" / "leagues.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    value = round(float(weight), 3)
+    if re.search(r"^\s*bookie_blend_weight:\s*[\d.]+", text, re.MULTILINE):
+        text = re.sub(
+            r"^(\s*bookie_blend_weight:\s*)[\d.]+",
+            rf"\g<1>{value}",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        anchor = "model:\n"
+        if anchor not in text:
+            text = text.rstrip() + f"\n\nmodel:\n  bookie_blend_weight: {value}\n"
+        else:
+            text = text.replace(anchor, f"{anchor}  bookie_blend_weight: {value}\n", 1)
+    config_path.write_text(text, encoding="utf-8")
+
+
 def league_summary() -> str:
     cfg = load_leagues_config()
     active = list(enabled_leagues().keys())
