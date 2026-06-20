@@ -12,7 +12,7 @@ from config.settings import (
     today,
 )
 from predictors.blunder_sniffer import BlunderSniffer
-from predictors.game_forger import GameForger, _is_completed, _parse_dates
+from predictors.game_forger import GameForger, _apply_div_filter, _is_completed, _parse_dates
 from predictors.registry import latest_model_path, load_game_forger, save_game_forger
 from scripts.backtest import backtest_predictions, format_prediction
 from scripts.scrape_football_data import scrape_matches
@@ -46,8 +46,10 @@ def ingest_data(reset: bool = False) -> None:
     print("Ingest complete.")
 
 
-def get_future_matches(matches: pd.DataFrame) -> pd.DataFrame:
+def get_future_matches(matches: pd.DataFrame, div_filter: list[str] | None = None) -> pd.DataFrame:
     matches = _parse_dates(matches)
+    if div_filter:
+        matches = _apply_div_filter(matches, div_filter)
     now = today()
     upcoming = matches[~_is_completed(matches)]
     return upcoming[upcoming["Date"] >= now].sort_values("Date")
@@ -63,11 +65,19 @@ def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool =
         use_cache=use_cache,
         refresh_cache=refresh_cache,
         div_filter=div_codes,
+        chaos_cache_only=not refresh_cache,
     )
     forger.evaluate_holdout()
     predictions = forger.backtest_on_holdout(confidence_threshold=0.0)
     matches = read_matches()
+    matches = _apply_div_filter(matches, div_codes)
     backtest_predictions(predictions, matches)
+    meta = forger.training_metadata
+    if meta:
+        print(
+            f"Split: walk-forward {meta.get('train_matches')} train / "
+            f"{meta.get('test_matches')} test"
+        )
 
     sniffer = BlunderSniffer()
     sniffer.train()
@@ -86,12 +96,14 @@ def run_predict(
     refresh_cache: bool = False,
     model_path: str | None = None,
 ) -> None:
+    div_codes = league_div_codes()
     matches = read_matches()
-    future = get_future_matches(matches)
+    future = get_future_matches(matches, div_filter=div_codes)
     if future.empty:
-        print("No upcoming fixtures found.")
+        print("No upcoming league fixtures found.")
         return
 
+    print(f"Predict scope: Big 5 leagues {div_codes}")
     print(f"Processing {len(future)} future matches")
     forger = GameForger()
 
@@ -103,6 +115,8 @@ def run_predict(
             limit=limit,
             use_cache=use_cache,
             refresh_cache=refresh_cache,
+            div_filter=div_codes,
+            chaos_cache_only=not refresh_cache,
         )
 
     forger.prepare_prediction_data(
@@ -110,6 +124,8 @@ def run_predict(
         injuries_df=DEFAULT_INJURIES,
         use_cache=use_cache,
         refresh_cache=refresh_cache,
+        div_filter=div_codes,
+        chaos_cache_only=False,
     )
     predictions = forger.predict(confidence_threshold=confidence)
     print("\nPredictions:")

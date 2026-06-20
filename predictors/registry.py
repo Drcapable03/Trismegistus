@@ -19,10 +19,17 @@ def save_game_forger(forger, tag: str = "game_forger") -> Path:
         "outcome_features": forger.outcome_features,
         "goals_features": forger.goals_features,
         "sim_runs": forger.sim_runs,
+        "bookie_blend_weight": forger.bookie_blend_weight,
+        "training_metadata": getattr(forger, "training_metadata", {}),
     }
     joblib.dump(payload, path)
     print(f"Saved model to {path}")
     return path
+
+
+def latest_model_path(tag: str = "game_forger") -> Path | None:
+    candidates = sorted(MODELS_DIR.glob(f"{tag}_*.joblib"), reverse=True)
+    return candidates[0] if candidates else None
 
 
 def load_game_forger(forger, path: str | Path) -> None:
@@ -32,9 +39,8 @@ def load_game_forger(forger, path: str | Path) -> None:
     forger.outcome_features = payload["outcome_features"]
     forger.goals_features = payload["goals_features"]
     forger.sim_runs = payload.get("sim_runs", forger.sim_runs)
+    if "bookie_blend_weight" in payload:
+        forger.bookie_blend_weight = float(payload["bookie_blend_weight"])
+    if "training_metadata" in payload:
+        forger.training_metadata = payload["training_metadata"]
     print(f"Loaded model from {path}")
-
-
-def latest_model_path(tag: str = "game_forger") -> Path | None:
-    candidates = sorted(MODELS_DIR.glob(f"{tag}_*.joblib"), reverse=True)
-    return candidates[0] if candidates else None

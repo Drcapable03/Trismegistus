@@ -13,6 +13,8 @@ def _apply_div_filter(matches: pd.DataFrame, div_filter: str | list[str] | None)
 def calculate_team_form(div_filter: str | list[str] | None = None):
     matches = pd.read_sql("SELECT * FROM matches", engine)
     matches = _apply_div_filter(matches, div_filter)
+    if "FTR" in matches.columns:
+        matches = matches[matches["FTR"].isin(["H", "D", "A"])]
     if matches.empty:
         print("No matches for team form calculation.")
         return

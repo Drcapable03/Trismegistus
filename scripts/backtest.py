@@ -20,8 +20,12 @@ def backtest_predictions(predictions: list[dict], matches: pd.DataFrame | None =
 
     bookie_acc = 0.0
     if matches is not None and not matches.empty:
-        merged = matches.merge(
-            pred_df,
+        m = matches.copy()
+        m["Date"] = pd.to_datetime(m["Date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")
+        p = pred_df.copy()
+        p["date"] = pd.to_datetime(p["date"], dayfirst=True, errors="coerce").dt.strftime("%d/%m/%Y")
+        merged = m.merge(
+            p,
             left_on=["HomeTeam", "AwayTeam", "Date"],
             right_on=["home", "away", "date"],
             how="inner",
@@ -29,8 +33,8 @@ def backtest_predictions(predictions: list[dict], matches: pd.DataFrame | None =
         if not merged.empty and {"B365H", "B365A", "B365D", "FTR"}.issubset(merged.columns):
             bookie_acc = bookie_accuracy(merged)
 
-    print(f"Trismegistus Accuracy: {accuracy:.1f}%")
-    print(f"Bookie Accuracy (overround-stripped B365): {bookie_acc:.1f}%")
+    print(f"Trismegistus Accuracy (deterministic holdout): {accuracy:.1f}%")
+    print(f"Bookie Accuracy on same holdout rows (B365): {bookie_acc:.1f}%")
     return accuracy, bookie_acc
 
 

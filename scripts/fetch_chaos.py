@@ -14,6 +14,15 @@ from utils.chaos_cache import cache_stats, get_cached, save_cached
 
 TEAM_CITIES_PATH = Path(__file__).resolve().parent.parent / "config" / "team_cities.yaml"
 
+CHAOS_DEFAULTS = {
+    "rain": 0.0,
+    "wind": 0.0,
+    "home_x_sentiment": 0.0,
+    "away_x_sentiment": 0.0,
+    "home_injuries": 0,
+    "away_injuries": 0,
+}
+
 
 def _load_team_cities() -> dict[str, str]:
     if not TEAM_CITIES_PATH.exists():
@@ -65,17 +74,48 @@ def _fetch_weather(city: str, date_str: str) -> tuple[float, float]:
         return 0, 0
 
 
-def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: bool = False):
+def _odds_from_row(row: pd.Series) -> dict[str, float]:
+    if {"B365H", "B365D", "B365A"}.issubset(row.index):
+        h, d, a = row["B365H"], row["B365D"], row["B365A"]
+        if pd.notna(h) and pd.notna(d) and pd.notna(a) and min(h, d, a) > 0:
+            return {"H": float(h), "D": float(d), "A": float(a)}
+    return {"H": 0.0, "D": 0.0, "A": 0.0}
+
+
+def _default_record(home_team: str, away_team: str, date_display: str, row: pd.Series) -> dict:
+    odds = _odds_from_row(row)
+    return {
+        "HomeTeam": home_team,
+        "AwayTeam": away_team,
+        "Date": date_display,
+        **CHAOS_DEFAULTS,
+        "odds_H": odds["H"],
+        "odds_A": odds["A"],
+        "odds_D": odds["D"],
+    }
+
+
+def get_chaos_data(
+    matches,
+    injuries_df=None,
+    use_cache: bool = True,
+    refresh: bool = False,
+    cache_only: bool = False,
+):
+    """Enrich matches with chaos features. One output row per input row.
+
+    cache_only=True (training/backtest): use SQLite cache or row defaults — no live scrape.
+    """
     chaos_data = []
-    total_matches = min(len(matches), 50)
-    current_date = today()
     team_cities = _load_team_cities()
     cache_hits = 0
+    cache_misses = 0
+    live_fetches = 0
+    total = len(matches)
 
-    subset = matches.head(total_matches)
-    for n, (_, row) in enumerate(subset.iterrows(), start=1):
+    for n, (_, row) in enumerate(matches.iterrows(), start=1):
         home_team, away_team, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
-        date_obj, date_str, date_display = _normalize_date(date)
+        _, date_str, date_display = _normalize_date(date)
 
         if use_cache and not refresh:
             cached = get_cached(home_team, away_team, date_display)
@@ -88,7 +128,13 @@ def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: b
                 ]})
                 continue
 
-        print(f"Fetching chaos for {home_team} vs. {away_team} on {date_display} ({n}/{total_matches})")
+        if cache_only:
+            cache_misses += 1
+            chaos_data.append(_default_record(home_team, away_team, date_display, row))
+            continue
+
+        print(f"Fetching chaos for {home_team} vs. {away_team} on {date_display} ({n}/{total})")
+        live_fetches += 1
 
         city = _city_for_team(home_team, team_cities)
         rain, wind = _fetch_weather(city, date_str)
@@ -96,7 +142,7 @@ def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: b
         home_sentiment = fetch_news(home_team, date_str)
         away_sentiment = fetch_news(away_team, date_str)
 
-        odds = fetch_odds(home_team, away_team, date_str) or {"H": 0, "A": 0, "D": 0}
+        odds = fetch_odds(home_team, away_team, date_str) or _odds_from_row(row)
 
         if injuries_df is not None and not injuries_df.empty:
             home_injury_count = len(
@@ -129,5 +175,9 @@ def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: b
         time.sleep(1)
 
     stats = cache_stats()
-    print(f"Chaos cache: {cache_hits} hits, {stats['cached_matches']} total cached rows")
+    print(
+        f"Chaos: {cache_hits} cache hits, {cache_misses} defaults"
+        f"{f', {live_fetches} live fetches' if live_fetches else ''}"
+        f" ({stats['cached_matches']} rows in cache)"
+    )
     return pd.DataFrame(chaos_data)

@@ -92,7 +92,11 @@ def test_game_forger_training_div_filter(monkeypatch):
     pd.DataFrame(rows).to_sql("matches", engine, if_exists="append", index=False)
 
     forger = GameForger()
-    forger.prepare_training_data(limit=50, use_cache=False, div_filter="WC26")
+    forger.prepare_training_data(limit=50, use_cache=False, div_filter="WC26", chaos_cache_only=True)
     assert forger.train_data is not None
-    X_train_o, y_train_o, _, _ = forger.train_data
+    X_train_o, y_train_o, _, y_train_g = forger.train_data
+    _, _, _, y_test_g = forger.test_data
     assert len(X_train_o) <= 12
+    assert forger.training_metadata["split_method"] == "walk_forward"
+    assert len(y_train_o) == len(y_train_g)
+    assert len(forger.test_data[1]) == len(y_test_g)

@@ -85,11 +85,13 @@ def predict_worldcup(confidence: float = 60.0, max_upcoming: int = 5) -> None:
         limit=len(completed),
         use_cache=True,
         div_filter=WC_DIV,
+        chaos_cache_only=True,
     )
     forger.prepare_prediction_data(
         upcoming.head(max_upcoming),
         use_cache=True,
         div_filter=WC_DIV,
+        chaos_cache_only=False,
     )
     preds = forger.predict(confidence_threshold=confidence)
     print("\nWorld Cup Predictions (test harness — core product is Big 5 leagues):")

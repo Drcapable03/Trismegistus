@@ -17,7 +17,12 @@ def tune_blend(
     print(f"Tuning blend on holdout (div_filter={div_codes}, limit={limit})")
 
     forger = GameForger()
-    forger.train(limit=limit, use_cache=use_cache, div_filter=div_codes)
+    forger.train(
+        limit=limit,
+        use_cache=use_cache,
+        div_filter=div_codes,
+        chaos_cache_only=True,
+    )
 
     model_only = forger.holdout_blend_accuracy(blend_weight=0.0)
     bookie_only = forger.holdout_blend_accuracy(blend_weight=1.0)
