@@ -1,0 +1,42 @@
+# Home team -> city for weather geocoding (avoids fragile name splitting)
+Manchester United: Manchester
+Manchester City: Manchester
+Liverpool: Liverpool
+Arsenal: London
+Chelsea: London
+Tottenham: London
+West Ham: London
+Crystal Palace: London
+Fulham: London
+Brentford: London
+Wolves: Wolverhampton
+Leicester: Leicester
+Everton: Liverpool
+Newcastle: Newcastle
+Aston Villa: Birmingham
+Brighton: Brighton
+Bournemouth: Bournemouth
+Nottingham Forest: Nottingham
+Sheffield Utd: Sheffield
+Sheffield Weds: Sheffield
+Burnley: Burnley
+Luton: Luton
+Ipswich: Ipswich
+Southampton: Southampton
+Leeds: Leeds
+Real Madrid: Madrid
+Barcelona: Barcelona
+Atletico Madrid: Madrid
+Bayern Munich: Munich
+Dortmund: Dortmund
+Inter: Milan
+AC Milan: Milan
+Juventus: Turin
+Napoli: Naples
+Roma: Rome
+Lazio: Rome
+PSG: Paris
+Marseille: Marseille
+Lyon: Lyon
+Monaco: Monaco
+Lille: Lille

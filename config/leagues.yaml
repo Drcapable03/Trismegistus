@@ -1,0 +1,16 @@
+# football-data.co.uk season folder (e.g. 2526 = 2025/26)
+season: "2526"
+
+leagues:
+  Premier League:
+    code: E0
+  La Liga:
+    code: SP1
+  Bundesliga:
+    code: D1
+  Serie A:
+    code: I1
+  Ligue 1:
+    code: F1
+
+fixtures_url: "https://www.football-data.co.uk/fixtures.csv"

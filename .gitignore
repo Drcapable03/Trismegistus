@@ -1,1 +1,9 @@
 .env
+__pycache__/
+*.pyc
+.pytest_cache/
+data/trismegistus.db
+data/models/
+data/raw_matches_*.csv
+*.egg-info/
+.venv/
