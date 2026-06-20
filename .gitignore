@@ -5,5 +5,7 @@ __pycache__/
 data/trismegistus.db
 data/models/
 data/raw_matches_*.csv
+data/worldcup_scraped.csv
+terminals/
 *.egg-info/
 .venv/

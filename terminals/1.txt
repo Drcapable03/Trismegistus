@@ -1,7 +1,0 @@
----
-pid: 26320
-cwd: "C:\Users\USER\Trismegistus"
-command: "cd \"C:\\Users\\USER\\Trismegistus\"; python -m poetry run python main.py --worldcup-ingest --worldcup-predict --confidence 55 --no-cache 2>&1 | Select-Object -Last 40"
-started_at: 2026-06-20T14:25:02.076Z
-running_for_ms: 995006   
----
