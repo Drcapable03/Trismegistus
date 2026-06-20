@@ -1,4 +1,8 @@
-"""World Cup 2026 scrape → ingest → predict test pipeline."""
+"""World Cup 2026 scrape → ingest → predict test pipeline.
+
+World Cup is a temporary live-data harness while Big 5 leagues may be off-season.
+Core product remains the leagues in config/leagues.yaml.
+"""
 
 import pandas as pd
 
@@ -11,6 +15,8 @@ from scripts.backtest import format_prediction
 from utils.db import load_csv_to_db, read_matches
 from utils.features import calculate_team_form
 
+WC_DIV = "WC26"
+
 
 def ingest_worldcup(df: pd.DataFrame | None = None) -> pd.DataFrame:
     df = df if df is not None else scrape_worldcup_odds(include_results=True)
@@ -18,7 +24,6 @@ def ingest_worldcup(df: pd.DataFrame | None = None) -> pd.DataFrame:
         print("No World Cup data scraped.")
         return df
 
-    # Align with matches table columns
     out = df[[
         "Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR",
         "B365H", "B365D", "B365A",
@@ -26,13 +31,13 @@ def ingest_worldcup(df: pd.DataFrame | None = None) -> pd.DataFrame:
     tmp = "data/worldcup_scraped.csv"
     out.to_csv(tmp, index=False)
     load_csv_to_db(tmp, "matches")
-    calculate_team_form()
-    print(f"Ingested {len(out)} World Cup matches")
+    calculate_team_form(div_filter=WC_DIV)
+    print(f"Ingested {len(out)} World Cup matches (form scoped to {WC_DIV})")
     return out
 
 
 def test_scrape_sample(limit: int = 5) -> None:
-    print("=== World Cup Scrape Test ===")
+    print("=== World Cup Scrape Test (temporary harness; core leagues in leagues.yaml) ===")
     clear_odds_cache()
     df = scrape_worldcup_odds(include_results=True)
     print(df.head(limit).to_string())
@@ -55,7 +60,7 @@ def test_scrape_sample(limit: int = 5) -> None:
 
 def predict_worldcup(confidence: float = 60.0, max_upcoming: int = 5) -> None:
     matches = read_matches()
-    wc = matches[matches["Div"] == "WC26"] if "Div" in matches.columns else matches
+    wc = matches[matches["Div"] == WC_DIV] if "Div" in matches.columns else matches
     if wc.empty:
         print("No WC26 matches in DB — run ingest first.")
         return
@@ -69,10 +74,22 @@ def predict_worldcup(confidence: float = 60.0, max_upcoming: int = 5) -> None:
         print("No upcoming WC matches to predict.")
         return
 
+    print(
+        f"Training on {len(completed)} completed WC26 matches "
+        f"(not mixing with league data)"
+    )
     forger = GameForger()
-    forger.train(limit=min(40, len(completed)), use_cache=True)
-    forger.prepare_prediction_data(upcoming.head(max_upcoming), use_cache=True)
+    forger.train(
+        limit=len(completed),
+        use_cache=True,
+        div_filter=WC_DIV,
+    )
+    forger.prepare_prediction_data(
+        upcoming.head(max_upcoming),
+        use_cache=True,
+        div_filter=WC_DIV,
+    )
     preds = forger.predict(confidence_threshold=confidence)
-    print("\nWorld Cup Predictions:")
+    print("\nWorld Cup Predictions (test harness — core product is Big 5 leagues):")
     for p in preds:
         print(format_prediction(p))

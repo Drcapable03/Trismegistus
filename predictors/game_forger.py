@@ -5,12 +5,20 @@ from sklearn.linear_model import PoissonRegressor
 from sklearn.model_selection import train_test_split
 from sqlalchemy import inspect
 
+from evaluation.implied_odds import bookie_favorite, implied_probs_from_odds
 from utils.db import engine
 from scripts.fetch_chaos import get_chaos_data
 from scripts.fetch_referee import fetch_referee_bias
 
 OUTCOME_MAP = {"H": 1, "A": 2, "D": 0}
 OUTCOME_LABELS = {1: "Home Win", 2: "Away Win", 0: "Draw"}
+H2H_DEFAULTS = {
+    "h2h_home_win_pct": 0.46,
+    "h2h_avg_home_goals": 1.35,
+    "h2h_avg_away_goals": 1.15,
+}
+# When B365 odds exist, lean on market implied probs (helps sparse WC / early-season runs).
+BOOKIE_BLEND_WEIGHT = 0.55
 
 
 def _parse_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -23,11 +31,33 @@ def _is_completed(df: pd.DataFrame) -> pd.Series:
     return df["FTR"].isin(["H", "D", "A"])
 
 
+def _add_implied_odds_features(data: pd.DataFrame) -> pd.DataFrame:
+    data = data.copy()
+    implied = data.apply(
+        lambda r: implied_probs_from_odds(
+            r.get("B365H", 0), r.get("B365D", 0), r.get("B365A", 0),
+        ),
+        axis=1,
+    )
+    data["implied_prob_D"] = [p[0] for p in implied]
+    data["implied_prob_H"] = [p[1] for p in implied]
+    data["implied_prob_A"] = [p[2] for p in implied]
+    return data
+
+
+def _apply_div_filter(matches: pd.DataFrame, div_filter: str | list[str] | None) -> pd.DataFrame:
+    if not div_filter or "Div" not in matches.columns:
+        return matches
+    codes = [div_filter] if isinstance(div_filter, str) else list(div_filter)
+    return matches[matches["Div"].isin(codes)]
+
+
 def _merge_features(
     matches: pd.DataFrame,
     injuries_df=None,
     use_cache: bool = True,
     refresh_cache: bool = False,
+    div_filter: str | list[str] | None = None,
 ) -> pd.DataFrame:
     matches = matches.copy()
     if pd.api.types.is_datetime64_any_dtype(matches["Date"]):
@@ -43,6 +73,7 @@ def _merge_features(
     )
     refs = fetch_referee_bias(matches)
     all_matches = pd.read_sql("SELECT * FROM matches", engine)
+    all_matches = _apply_div_filter(all_matches, div_filter)
     all_matches = _parse_dates(all_matches)
     completed = all_matches[_is_completed(all_matches)]
     h2h = completed.groupby(["HomeTeam", "AwayTeam"]).agg(
@@ -62,7 +93,10 @@ def _merge_features(
     ).merge(chaos, on=["HomeTeam", "AwayTeam", "Date"], how="left")
     data = data.merge(refs, on=["HomeTeam", "AwayTeam", "Date"], how="left")
     data = data.merge(h2h, on=["HomeTeam", "AwayTeam"], how="left")
-    return data
+    for col, default in H2H_DEFAULTS.items():
+        if col in data.columns:
+            data[col] = data[col].fillna(default)
+    return _add_implied_odds_features(data)
 
 
 class GameForger:
@@ -82,7 +116,9 @@ class GameForger:
 
     def _feature_columns(self, data: pd.DataFrame) -> tuple[list[str], list[str]]:
         outcome_cols = [
-            "B365H", "B365A", "B365D", "home_x_sentiment", "away_x_sentiment",
+            "B365H", "B365A", "B365D",
+            "implied_prob_H", "implied_prob_D", "implied_prob_A",
+            "home_x_sentiment", "away_x_sentiment",
             "rain", "wind", "home_win_pct", "yellows_per_game", "odds_H", "odds_A", "odds_D",
             "h2h_home_win_pct", "h2h_avg_home_goals", "h2h_avg_away_goals",
         ]
@@ -99,16 +135,23 @@ class GameForger:
         limit: int | None = None,
         use_cache: bool = True,
         refresh_cache: bool = False,
+        div_filter: str | list[str] | None = None,
     ):
         matches = _parse_dates(pd.read_sql("SELECT * FROM matches", engine))
+        matches = _apply_div_filter(matches, div_filter)
         completed = matches[_is_completed(matches)].sort_values("Date", ascending=False)
         if limit:
             completed = completed.head(limit)
         if completed.empty:
-            raise ValueError("No completed matches with results found for training.")
+            scope = f" for Div={div_filter}" if div_filter else ""
+            raise ValueError(f"No completed matches with results found for training{scope}.")
 
         data = _merge_features(
-            completed, injuries_df, use_cache=use_cache, refresh_cache=refresh_cache,
+            completed,
+            injuries_df,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+            div_filter=div_filter,
         )
         outcome_cols, goals_cols = self._feature_columns(data)
 
@@ -117,7 +160,6 @@ class GameForger:
         X_goals = data[goals_cols].fillna(0)
         y_goals = data["FTHG"] + data["FTAG"]
 
-        data["implied_prob_H"] = 1 / data["B365H"].replace(0, np.nan)
         data["odds_error"] = (data["FTR"] != "H") & (data["implied_prob_H"] > 0.7)
 
         self.outcome_features = list(X_outcome.columns)
@@ -135,7 +177,8 @@ class GameForger:
         self.train_data = (X_train_o, y_train_o, X_train_g, y_train_g)
         self.test_data = (X_test_o, y_test_o, X_test_g, y_test_g)
         self.context = test_context
-        print(f"Prepared training data: {len(completed)} completed matches")
+        scope = f" ({div_filter})" if div_filter else ""
+        print(f"Prepared training data: {len(completed)} completed matches{scope}")
 
     def prepare_prediction_data(
         self,
@@ -143,19 +186,28 @@ class GameForger:
         injuries_df=None,
         use_cache: bool = True,
         refresh_cache: bool = False,
+        div_filter: str | list[str] | None = None,
     ):
         future_matches = _parse_dates(future_matches)
         if future_matches.empty:
             self.prediction_data = None
             return
         data = _merge_features(
-            future_matches, injuries_df, use_cache=use_cache, refresh_cache=refresh_cache,
+            future_matches,
+            injuries_df,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+            div_filter=div_filter,
         )
         outcome_cols, goals_cols = self._feature_columns(data)
+        context_cols = ["HomeTeam", "AwayTeam", "Date"]
+        for col in ("B365H", "B365D", "B365A"):
+            if col in data.columns:
+                context_cols.append(col)
         self.prediction_data = {
             "X_outcome": data[outcome_cols].fillna(0),
             "X_goals": data[goals_cols].fillna(0),
-            "context": data[["HomeTeam", "AwayTeam", "Date"]].copy(),
+            "context": data[context_cols].copy(),
         }
         print(f"Prepared {len(future_matches)} future matches for prediction")
 
@@ -165,10 +217,15 @@ class GameForger:
         limit: int | None = None,
         use_cache: bool = True,
         refresh_cache: bool = False,
+        div_filter: str | list[str] | None = None,
     ):
         if self.train_data is None:
             self.prepare_training_data(
-                injuries_df, limit, use_cache=use_cache, refresh_cache=refresh_cache,
+                injuries_df,
+                limit,
+                use_cache=use_cache,
+                refresh_cache=refresh_cache,
+                div_filter=div_filter,
             )
         X_train_o, y_train_o, X_train_g, y_train_g = self.train_data
         self.outcome_model.fit(X_train_o, y_train_o)
@@ -186,10 +243,27 @@ class GameForger:
         print(f"Holdout Model Accuracy: {accuracy:.1f}%")
         return accuracy
 
-    def simulate_match(self, outcome_features, goals_features):
+    def _blend_with_bookie(
+        self,
+        model_probs: np.ndarray,
+        b365: tuple[float, float, float] | None,
+    ) -> np.ndarray:
+        if b365 is None:
+            return model_probs
+        h, d, a = b365
+        if min(h, d, a) <= 0:
+            return model_probs
+        p_d, p_h, p_a = implied_probs_from_odds(h, d, a)
+        bookie = np.array([p_d, p_h, p_a], dtype=float)
+        w = BOOKIE_BLEND_WEIGHT
+        blended = (1 - w) * model_probs + w * bookie
+        total = blended.sum()
+        return blended / total if total > 0 else model_probs
+
+    def simulate_match(self, outcome_features, goals_features, b365: tuple[float, float, float] | None = None):
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
-        probs = self.outcome_model.predict_proba(outcome_df)[0]
+        probs = self._blend_with_bookie(self.outcome_model.predict_proba(outcome_df)[0], b365)
         outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=probs)
         goals_pred = self.goals_model.predict(goals_df)[0]
         goals = np.random.poisson(max(0, goals_pred), size=self.sim_runs)
@@ -207,10 +281,26 @@ class GameForger:
             home = context.iloc[i]["HomeTeam"]
             away = context.iloc[i]["AwayTeam"]
             date = context.iloc[i]["Date"]
-            outcomes, goals, probs = self.simulate_match(X_outcome.iloc[i], X_goals.iloc[i])
+            row = context.iloc[i]
+            b365 = None
+            if {"B365H", "B365D", "B365A"}.issubset(row.index):
+                h, d, a = row["B365H"], row["B365D"], row["B365A"]
+                if pd.notna(h) and pd.notna(d) and pd.notna(a) and min(h, d, a) > 0:
+                    b365 = (float(h), float(d), float(a))
+            outcomes, goals, probs = self.simulate_match(
+                X_outcome.iloc[i], X_goals.iloc[i], b365=b365,
+            )
+            goals_df = pd.DataFrame([X_goals.iloc[i]], columns=self.goals_features)
+            expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
             pred = int(np.bincount(outcomes).argmax())
             confidence = float(np.mean(outcomes == pred) * 100)
             if confidence >= confidence_threshold:
+                bookie_pick = None
+                if {"B365H", "B365D", "B365A"}.issubset(row.index):
+                    h, d, a = row["B365H"], row["B365D"], row["B365A"]
+                    if pd.notna(h) and pd.notna(d) and pd.notna(a) and min(h, d, a) > 0:
+                        bookie_code = bookie_favorite(float(h), float(d), float(a))
+                        bookie_pick = OUTCOME_LABELS[bookie_code]
                 results.append({
                     "home": home,
                     "away": away,
@@ -218,8 +308,10 @@ class GameForger:
                     "outcome": OUTCOME_LABELS[pred],
                     "outcome_code": pred,
                     "confidence": confidence,
+                    "expected_goals": expected_goals,
                     "total_goals": max(0, round(float(np.mean(goals)))),
                     "probs": {"H": float(probs[1]), "D": float(probs[0]), "A": float(probs[2])},
+                    "bookie_pick": bookie_pick,
                 })
         print(f"Filtered {len(results)} predictions with confidence >= {confidence_threshold}%")
         return results

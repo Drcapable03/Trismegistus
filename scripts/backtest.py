@@ -36,8 +36,19 @@ def backtest_predictions(predictions: list[dict], matches: pd.DataFrame | None =
 
 def format_prediction(pred: dict) -> str:
     blunder = " (Bookie Blunder!)" if pred.get("odds_error") else ""
+    goals = pred.get("expected_goals", pred.get("total_goals"))
+    goals_str = f"{goals:.1f}" if isinstance(goals, float) else str(goals)
+    bookie = ""
+    if pred.get("bookie_pick"):
+        bookie = f", Bookie: {pred['bookie_pick']}"
+    probs = pred.get("probs")
+    prob_str = ""
+    if probs:
+        prob_str = (
+            f" [H {probs['H']:.0%} / D {probs['D']:.0%} / A {probs['A']:.0%}]"
+        )
     return (
         f"Match: {pred['home']} vs. {pred['away']}, {pred['date']}, "
-        f"{pred['outcome']}, {pred['confidence']:.1f}%, "
-        f"~{pred['total_goals']} goals{blunder}"
+        f"Model: {pred['outcome']}, {pred['confidence']:.1f}%, "
+        f"~{goals_str} xG{bookie}{prob_str}{blunder}"
     )

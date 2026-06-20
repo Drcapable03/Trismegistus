@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from dotenv import load_dotenv
 
-from config.settings import fixtures_url, league_summary, league_urls, today
+from config.settings import enabled_leagues, fixtures_url, league_summary, league_urls, today
 from predictors.blunder_sniffer import BlunderSniffer
 from predictors.game_forger import GameForger, _is_completed, _parse_dates
 from predictors.registry import latest_model_path, load_game_forger, save_game_forger
@@ -35,7 +35,8 @@ def ingest_data(reset: bool = False) -> None:
 
     csv_path = scrape_matches(fixtures_url(), "Fixtures")
     load_csv_to_db(csv_path, "matches")
-    calculate_team_form()
+    league_codes = [info["code"] for info in enabled_leagues().values()]
+    calculate_team_form(div_filter=league_codes)
     print("Ingest complete.")
 
 
