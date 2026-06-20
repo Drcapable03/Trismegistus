@@ -1,0 +1,159 @@
+---
+pid: 26432
+cwd: "C:\Users\USER\Trismegistus"
+command: "cd \"C:\\Users\\USER\\Trismegistus\"; python -m poetry run python main.py --worldcup-predict --confidence 55"
+started_at: 2026-06-20T14:43:34.747Z
+running_for_ms: 185002   
+---
+[2026-06-20 10:43:49] INFO: Fetched (200) <GET https://www.google.com/search?q=Turkey+World+Cup+2026+football+news&tbm=nws&hl=en&sei=I6c2au6FGNvO2roPo-2dyQY> (referer: https://www.google.com/)
+[2026-06-20 10:43:53] INFO: Fetched (200) <GET https://www.google.com/search?q=Paraguay+World+Cup+2026+football+news&tbm=nws&hl=en&sei=J6c2av7TE_LW1e8Pm9SDkAI> (referer: https://www.google.com/)
+[2026-06-20 10:44:05] INFO: Fetched (200) <GET https://www.oddsportal.com/football/world/world-championship-2026/> (referer: https://www.google.com/)
+[2026-06-20 10:44:18] INFO: Fetched (200) <GET https://www.oddsportal.com/football/world/world-championship-2026/results/> (referer: https://www.google.com/)
+[2026-06-20 10:44:25] INFO: Fetched (200) <GET https://www.google.com/search?q=Turkey+World+Cup+2026+injury+squad&hl=en&sei=RKc2apPtF-ypvr0Py9WCQA> (referer: https://www.google.com/)
+[2026-06-20 10:44:33] INFO: Fetched (200) <GET https://www.google.com/search?q=Paraguay+World+Cup+2026+injury+squad&hl=en&sei=TKc2aviDBePl2roPg5u20AY> (referer: https://www.google.com/)
+[2026-06-20 10:44:40] INFO: Fetched (200) <GET https://www.google.com/search?q=Austria+World+Cup+2026+football+news&tbm=nws&hl=en&sei=V6c2atmVBJq9vr0PxLO4oQk> (referer: https://www.google.com/)
+[2026-06-20 10:44:46] INFO: Fetched (200) <GET https://www.google.com/search?q=Jordan+World+Cup+2026+football+news&tbm=nws&hl=en&sei=W6c2arSMFNCFvr0PgPra8QI> (referer: https://www.google.com/)
+[2026-06-20 10:44:56] INFO: Fetched (200) <GET https://www.google.com/search?q=Austria+World+Cup+2026+injury+squad&hl=en&sei=YKc2auD7NbXb2roP2aChoAY> (referer: https://www.google.com/)
+[2026-06-20 10:45:06] INFO: Fetched (200) <GET https://www.google.com/search?q=Jordan+World+Cup+2026+injury+squad&hl=en&sei=bac2aqdd2KHV7w-up5_RBA> (referer: https://www.google.com/)
+[2026-06-20 10:45:14] INFO: Fetched (200) <GET https://www.google.com/search?q=Argentina+World+Cup+2026+football+news&tbm=nws&hl=en&sei=eKc2asO8BI_Q2roP9Nfv4AY> (referer: https://www.google.com/)
+[2026-06-20 10:45:19] INFO: Fetched (200) <GET https://www.google.com/search?q=Algeria+World+Cup+2026+football+news&tbm=nws&hl=en&sei=fac2aqnIIa-w2roP-oLj4QY> (referer: https://www.google.com/)
+[2026-06-20 10:45:27] INFO: Fetched (200) <GET https://www.google.com/search?q=Argentina+World+Cup+2026+injury+squad&hl=en&sei=gqc2aquVM_Cg1e8PvL7WGQ> (referer: https://www.google.com/)
+[2026-06-20 10:45:39] INFO: Fetched (200) <GET https://www.google.com/search?q=Algeria+World+Cup+2026+injury+squad&hl=en&sei=iqc2avjGFoqOvr0P__WC6AQ> (referer: https://www.google.com/)
+[2026-06-20 10:45:48] INFO: Fetched (200) <GET https://www.google.com/search?q=Iraq+World+Cup+2026+football+news&tbm=nws&hl=en&sei=mac2aoO-D8uovr0PwOnh2QQ> (referer: https://www.google.com/)
+[2026-06-20 10:45:55] INFO: Fetched (200) <GET https://www.google.com/search?q=Norway+World+Cup+2026+football+news&tbm=nws&hl=en&sei=oKc2aoCWB8uMvr0PzuWBqAc> (referer: https://www.google.com/)
+[2026-06-20 10:46:06] INFO: Fetched (200) <GET https://www.google.com/search?q=Iraq+World+Cup+2026+injury+squad&hl=en&sei=pqc2apLCGICPvr0PrLSTsQ4> (referer: https://www.google.com/)
+[2026-06-20 10:46:19] INFO: Fetched (200) <GET https://www.google.com/search?q=Norway+World+Cup+2026+injury+squad&hl=en&sei=s6c2aruPGNmlvr0P3ZeC0A4> (referer: https://www.google.com/)
+[2026-06-20 10:46:28] INFO: Fetched (200) <GET https://www.google.com/search?q=France+World+Cup+2026+football+news&tbm=nws&hl=en&sei=wac2arDXHvOzvr0Ph7j9yAw> (referer: https://www.google.com/)
+[2026-06-20 10:46:33] INFO: Fetched (200) <GET https://www.google.com/search?q=Senegal+World+Cup+2026+football+news&tbm=nws&hl=en&sei=xqc2arvlKfT31e8PweyBsAU> (referer: https://www.google.com/)
+[2026-06-20 10:46:43] INFO: Fetched (200) <GET https://www.google.com/search?q=France+World+Cup+2026+injury+squad&hl=en&sei=zKc2aqOcDsXd1e8PsM6x-Qs> (referer: https://www.google.com/)
+[2026-06-20 10:46:55] INFO: Fetched (200) <GET https://www.google.com/search?q=Senegal+World+Cup+2026+injury+squad&hl=en&sei=16c2aotj9r6-vQ-CvYGgDw> (referer: https://www.google.com/)
+[2026-06-20 10:47:03] INFO: Fetched (200) <GET https://www.google.com/search?q=Saudi+Arabia+World+Cup+2026+football+news&tbm=nws&hl=en&sei=5ac2aqKLHb6l2roPyre46QY> (referer: https://www.google.com/)
+[2026-06-20 10:47:09] INFO: Fetched (200) <GET https://www.google.com/search?q=Uruguay+World+Cup+2026+football+news&tbm=nws&hl=en&sei=6qc2arm_EPK9rfcPsMq2kQY> (referer: https://www.google.com/)
+[2026-06-20 10:47:20] INFO: Fetched (200) <GET https://www.google.com/search?q=Saudi+Arabia+World+Cup+2026+injury+squad&hl=en&sei=76c2auayKoTq1e8P-IS1wAg> (referer: https://www.google.com/)
+[2026-06-20 10:47:33] INFO: Fetched (200) <GET https://www.google.com/search?q=Uruguay+World+Cup+2026+injury+squad&hl=en&sei=_ac2asLvFO_T2roPzIvOyQY> (referer: https://www.google.com/)
+[2026-06-20 10:47:40] INFO: Fetched (200) <GET https://www.google.com/search?q=Belgium+World+Cup+2026+football+news&tbm=nws&hl=en&sei=Cqg2aq2BDO7M1e8P3fOB0As> (referer: https://www.google.com/)
+[2026-06-20 10:47:43] INFO: Fetched (200) <GET https://www.google.com/search?q=Egypt+World+Cup+2026+football+news&tbm=nws&hl=en&sei=Dag2auO8Oe-0vr0PwKPd4QM> (referer: https://www.google.com/)
+[2026-06-20 10:47:49] INFO: Fetched (200) <GET https://www.google.com/search?q=Belgium+World+Cup+2026+injury+squad&hl=en&sei=Eag2aounBMDK2roPzpXlsAY> (referer: https://www.google.com/)
+[2026-06-20 10:47:57] INFO: Fetched (200) <GET https://www.google.com/search?q=Egypt+World+Cup+2026+injury+squad&hl=en&sei=GKg2aqvJEOGw2roPw8boyQY> (referer: https://www.google.com/)
+[2026-06-20 10:48:04] INFO: Fetched (200) <GET https://www.google.com/search?q=Spain+World+Cup+2026+football+news&tbm=nws&hl=en&sei=Iqg2auuzL4Ho1e8Py8qkoAg> (referer: https://www.google.com/)
+[2026-06-20 10:48:08] INFO: Fetched (200) <GET https://www.google.com/search?q=Cape+Verde+World+Cup+2026+football+news&tbm=nws&hl=en&sei=Jqg2ataMD6GPvr0P0pjH2Aw> (referer: https://www.google.com/)
+[2026-06-20 10:48:13] INFO: Fetched (200) <GET https://www.google.com/search?q=Spain+World+Cup+2026+injury+squad&hl=en&sei=Kag2arfGIpHi1e8P7diBuAE> (referer: https://www.google.com/)
+[2026-06-20 10:48:23] INFO: Fetched (200) <GET https://www.google.com/search?q=Cape+Verde+World+Cup+2026+injury+squad&hl=en&sei=MKg2aqSHPM3R0-kPouGruQY> (referer: https://www.google.com/)
+[2026-06-20 10:48:29] INFO: Fetched (200) <GET https://www.google.com/search?q=Brazil+World+Cup+2026+football+news&tbm=nws&hl=en&sei=O6g2aq70L_Pf1e8Pw7eB0AI> (referer: https://www.google.com/)
+[2026-06-20 10:48:33] INFO: Fetched (200) <GET https://www.google.com/search?q=Haiti+World+Cup+2026+football+news&tbm=nws&hl=en&sei=P6g2aprtBZu4rfcP6s6dmAY> (referer: https://www.google.com/)
+[2026-06-20 10:48:40] INFO: Fetched (200) <GET https://www.google.com/search?q=Brazil+World+Cup+2026+injury+squad&hl=en&sei=Q6g2atSIErLq1e8P-OeWoQg> (referer: https://www.google.com/)
+[2026-06-20 10:48:47] INFO: Fetched (200) <GET https://www.google.com/search?q=Haiti+World+Cup+2026+injury+squad&hl=en&sei=Sqg2ao6YPMfP1e8P0KersQc> (referer: https://www.google.com/)
+[2026-06-20 10:48:55] INFO: Fetched (200) <GET https://www.google.com/search?q=Germany+World+Cup+2026+football+news&tbm=nws&hl=en&sei=Vag2asqpCb6Ovr0Pse6U2QQ> (referer: https://www.google.com/)
+[2026-06-20 10:48:58] INFO: Fetched (200) <GET https://www.google.com/search?q=Ivory+Coast+World+Cup+2026+football+news&tbm=nws&hl=en&sei=WKg2avGbGuzg2roP5PXAwAY> (referer: https://www.google.com/)
+[2026-06-20 10:49:04] INFO: Fetched (200) <GET https://www.google.com/search?q=Germany+World+Cup+2026+injury+squad&hl=en&sei=W6g2auf1JKin2roPhaPo0QY> (referer: https://www.google.com/)
+[2026-06-20 10:49:10] INFO: Fetched (200) <GET https://www.google.com/search?q=Ivory+Coast+World+Cup+2026+injury+squad&hl=en&sei=Y6g2avKPFqytvr0PnMfM0QQ> (referer: https://www.google.com/)
+[2026-06-20 10:49:16] INFO: Fetched (200) <GET https://www.google.com/search?q=Ecuador+World+Cup+2026+football+news&tbm=nws&hl=en&sei=aqg2aoy1Aam8vr0Pn-fw0A0> (referer: https://www.google.com/)
+[2026-06-20 10:49:19] INFO: Fetched (200) <GET https://www.google.com/search?q=Curacao+World+Cup+2026+football+news&tbm=nws&hl=en&sei=bag2ave4OPOPvr0P8ejB0A0> (referer: https://www.google.com/)
+[2026-06-20 10:49:22] INFO: Fetched (200) <GET https://www.google.com/search?q=Ecuador+World+Cup+2026+injury+squad&hl=en&sei=cKg2aqXZObzU1e8PwtangQI> (referer: https://www.google.com/)
+[2026-06-20 10:49:32] INFO: Fetched (200) <GET https://www.google.com/search?q=Curacao+World+Cup+2026+injury+squad&hl=en&sei=dKg2av3rF-Cnvr0P086B0A4> (referer: https://www.google.com/)
+[2026-06-20 10:49:37] INFO: Fetched (200) <GET https://www.google.com/search?q=Spain+World+Cup+2026+football+news&tbm=nws&hl=en&sei=f6g2ap3MIIzI0-kP3MqF2A8> (referer: https://www.google.com/)
+[2026-06-20 10:49:40] INFO: Fetched (200) <GET https://www.google.com/search?q=Saudi+Arabia+World+Cup+2026+football+news&tbm=nws&hl=en&sei=gqg2apjQMurO2roPypi4yAY> (referer: https://www.google.com/)
+[2026-06-20 10:49:45] INFO: Fetched (200) <GET https://www.google.com/search?q=Spain+World+Cup+2026+injury+squad&hl=en&sei=hag2arSaPIfEvr0P5e2BqAE> (referer: https://www.google.com/)
+[2026-06-20 10:49:55] INFO: Fetched (200) <GET https://www.google.com/search?q=Saudi+Arabia+World+Cup+2026+injury+squad&hl=en&sei=jKg2apTfG6ik2roPt_C42AY> (referer: https://www.google.com/)
+[2026-06-20 10:50:01] INFO: Fetched (200) <GET https://www.google.com/search?q=Belgium+World+Cup+2026+football+news&tbm=nws&hl=en&sei=lqg2atHvLuik2roP6Oq9yAY> (referer: https://www.google.com/)
+[2026-06-20 10:50:04] INFO: Fetched (200) <GET https://www.google.com/search?q=Iran+World+Cup+2026+football+news&tbm=nws&hl=en&sei=m6g2apbBCqCmvr0PlZ6juQs> (referer: https://www.google.com/)
+[2026-06-20 10:50:10] INFO: Fetched (200) <GET https://www.google.com/search?q=Belgium+World+Cup+2026+injury+squad&hl=en&sei=nqg2arunGO-l2roPk_Pq4AI> (referer: https://www.google.com/)
+[2026-06-20 10:50:16] INFO: Fetched (200) <GET https://www.google.com/search?q=Iran+World+Cup+2026+injury+squad&hl=en&sei=pKg2aqH_B7iPvr0Pp8610AM> (referer: https://www.google.com/)
+Trismegistus is alive!
+Table 'matches' already exists.
+Fetching chaos for Turkey vs. Paraguay on 20/06/2026 (24/46)
+News scrape Turkey: 12 items -> sentiment 0.58
+News scrape Paraguay: 12 items -> sentiment 0.58
+Scraping OddsPortal: https://www.oddsportal.com/football/world/world-championship-2026/
+Scraping OddsPortal: https://www.oddsportal.com/football/world/world-championship-2026/results/
+Scraped 87 World Cup matches from OddsPortal
+Odds via OddsPortal: Turkey vs Paraguay -> H=2.17
+Injury scrape Turkey: 10 concern signals
+Injury scrape Paraguay: 10 concern signals
+Fetching chaos for Austria vs. Jordan on 20/06/2026 (36/46)
+News scrape Austria: 12 items -> sentiment 0.58
+News scrape Jordan: 12 items -> sentiment 0.58
+Odds via OddsPortal: Austria vs Jordan -> H=1.42
+Injury scrape Austria: 10 concern signals
+Injury scrape Jordan: 10 concern signals
+Fetching chaos for Argentina vs. Algeria on 20/06/2026 (37/46)
+News scrape Argentina: 12 items -> sentiment 0.58
+News scrape Algeria: 12 items -> sentiment 0.58
+Odds via OddsPortal: Argentina vs Algeria -> H=1.58
+Injury scrape Argentina: 7 concern signals
+Injury scrape Algeria: 10 concern signals
+Fetching chaos for Iraq vs. Norway on 20/06/2026 (38/46)
+News scrape Iraq: 12 items -> sentiment 0.58
+News scrape Norway: 12 items -> sentiment 0.58
+Odds via OddsPortal: Iraq vs Norway -> H=15.0
+Injury scrape Iraq: 10 concern signals
+Injury scrape Norway: 10 concern signals
+Fetching chaos for France vs. Senegal on 20/06/2026 (39/46)
+News scrape France: 12 items -> sentiment 0.58
+News scrape Senegal: 12 items -> sentiment 0.58
+Odds via OddsPortal: France vs Senegal -> H=1.53
+Injury scrape France: 0 concern signals
+Injury scrape Senegal: 10 concern signals
+Fetching chaos for Saudi Arabia vs. Uruguay on 20/06/2026 (41/46)
+News scrape Saudi Arabia: 12 items -> sentiment 0.58
+News scrape Uruguay: 12 items -> sentiment 0.58
+Odds via OddsPortal: Saudi Arabia vs Uruguay -> H=8.0
+Injury scrape Saudi Arabia: 10 concern signals
+Injury scrape Uruguay: 10 concern signals
+Fetching chaos for Belgium vs. Egypt on 20/06/2026 (42/46)
+News scrape Belgium: 12 items -> sentiment 0.58
+News scrape Egypt: 12 items -> sentiment 0.58
+Odds via OddsPortal: Belgium vs Egypt -> H=1.57
+Injury scrape Belgium: 10 concern signals
+Injury scrape Egypt: 10 concern signals
+Fetching chaos for Spain vs. Cape Verde on 20/06/2026 (43/46)
+News scrape Spain: 12 items -> sentiment 0.58
+News scrape Cape Verde: 12 items -> sentiment 0.58
+Odds via OddsPortal: Spain vs Cape Verde -> H=1.11
+Injury scrape Spain: 8 concern signals
+Injury scrape Cape Verde: 10 concern signals
+Fetching chaos for Brazil vs. Haiti on 20/06/2026 (44/46)
+News scrape Brazil: 12 items -> sentiment 0.58
+News scrape Haiti: 12 items -> sentiment 0.58
+Odds via OddsPortal: Brazil vs Haiti -> H=1.14
+Injury scrape Brazil: 10 concern signals
+Injury scrape Haiti: 10 concern signals
+Chaos cache: 37 hits, 98 total cached rows
+Referee bias assigned (mock data)
+Prepared training data: 46 completed matches
+Raw Model Accuracy (train): 94.4%
+Fetching chaos for Germany vs. Ivory Coast on 20/06/2026 (1/4)
+News scrape Germany: 12 items -> sentiment 0.58
+News scrape Ivory Coast: 12 items -> sentiment 0.58
+Odds via OddsPortal: Germany vs Ivory Coast -> H=1.55
+Injury scrape Germany: 10 concern signals
+Injury scrape Ivory Coast: 7 concern signals
+Fetching chaos for Ecuador vs. Curacao on 20/06/2026 (2/4)
+News scrape Ecuador: 12 items -> sentiment 0.58
+News scrape Curacao: 12 items -> sentiment 0.58
+Odds via OddsPortal: Ecuador vs Curacao -> H=1.16
+Injury scrape Ecuador: 0 concern signals
+Injury scrape Curacao: 7 concern signals
+Fetching chaos for Spain vs. Saudi Arabia on 20/06/2026 (3/4)
+News scrape Spain: 12 items -> sentiment 0.58
+News scrape Saudi Arabia: 12 items -> sentiment 0.58
+Odds via OddsPortal: Spain vs Saudi Arabia -> H=1.12
+Injury scrape Spain: 8 concern signals
+Injury scrape Saudi Arabia: 10 concern signals
+Fetching chaos for Belgium vs. Iran on 20/06/2026 (4/4)
+News scrape Belgium: 12 items -> sentiment 0.58
+News scrape Iran: 12 items -> sentiment 0.58
+Odds via OddsPortal: Belgium vs Iran -> H=1.48
+Injury scrape Belgium: 9 concern signals
+Injury scrape Iran: 10 concern signals
+Chaos cache: 0 hits, 102 total cached rows
+Referee bias assigned (mock data)
+Prepared 4 future matches for prediction
+Filtered 4 predictions with confidence >= 55.0%
+
+World Cup Predictions:
+Match: Germany vs. Ivory Coast, 20/06/2026, Draw, 69.3%, ~1 goals
+Match: Ecuador vs. Curacao, 20/06/2026, Draw, 71.5%, ~1 goals
+Match: Spain vs. Saudi Arabia, 20/06/2026, Draw, 70.7%, ~1 goals
+Match: Belgium vs. Iran, 20/06/2026, Draw, 69.1%, ~1 goals
+Done.

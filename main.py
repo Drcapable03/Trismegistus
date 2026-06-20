@@ -130,10 +130,16 @@ def main():
     parser.add_argument("--load-model", type=str, default=None, help="Path to saved model for --predict")
     parser.add_argument("--refresh-cache", action="store_true", help="Re-fetch chaos data ignoring cache")
     parser.add_argument("--no-cache", action="store_true", help="Disable chaos cache reads/writes")
+    parser.add_argument("--worldcup-scrape", action="store_true", help="Test Scrapling World Cup scrape")
+    parser.add_argument("--worldcup-ingest", action="store_true", help="Scrape and ingest World Cup matches")
+    parser.add_argument("--worldcup-predict", action="store_true", help="Predict upcoming World Cup fixtures")
     args = parser.parse_args()
 
     use_cache = not args.no_cache
-    run_all = not any([args.ingest, args.predict, args.backtest, args.explore])
+    run_all = not any([
+        args.ingest, args.predict, args.backtest, args.explore,
+        args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
+    ])
 
     print("Trismegistus is alive!")
     if args.ingest or run_all:
@@ -160,6 +166,15 @@ def main():
             refresh_cache=args.refresh_cache,
             model_path=args.load_model,
         )
+    if args.worldcup_scrape:
+        from scripts.worldcup_pipeline import test_scrape_sample
+        test_scrape_sample(limit=8)
+    if args.worldcup_ingest:
+        from scripts.worldcup_pipeline import ingest_worldcup
+        ingest_worldcup()
+    if args.worldcup_predict:
+        from scripts.worldcup_pipeline import predict_worldcup
+        predict_worldcup(confidence=args.confidence)
     print("Done.")
 
 

@@ -67,8 +67,8 @@ Historical OddsPortal odds.
 | 1 | football-data.co.uk | Done |
 | 1b | chaos cache, implied odds, model persistence | Done |
 | 1b | expandable leagues config | Done |
-| 2 | soccerdata (Understat xG, Club Elo) | Next |
-| 2 | Scrapling (injuries, live odds scrape) | Planned |
+| 2 | Scrapling (OddsPortal, news, injuries) | **Done** |
+| 2 | soccerdata (Understat xG, Club Elo) | Deferred — dep conflict with scrapling |
 | 2 | penaltyblog (Shin implied odds) | Optional upgrade |
 | 3 | FastAPI platform | Planned |
 

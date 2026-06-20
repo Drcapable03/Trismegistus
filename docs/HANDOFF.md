@@ -65,10 +65,17 @@ poetry run python main.py --reset --ingest --backtest --limit 30
 - Expandable leagues config (9 inactive slots, multi-season `2425`+`2526`)
 - `docs/API_COSTS.md` — subscription guidance ($0 viable)
 
+### Phase 2 completed (2026-06-20)
+- Scrapling integrated (`scrapers/`) — OddsPortal WC odds, Google News, injury search
+- World Cup pipeline: `--worldcup-scrape`, `--worldcup-ingest`, `--worldcup-predict`
+- Verified: 87 WC matches scraped, odds/news/injuries live, 4 predictions emitted
+- `soccerdata` deferred (pytest/cssselect conflict with scrapling) — revisit as optional extra
+
 ### Next steps
-1. Phase 2: `soccerdata` for Understat xG + Club Elo
-2. Phase 2: Scrapling for injuries/live odds scrape
-3. Optional: `penaltyblog` Shin method for implied odds
+1. Cache Scrapling odds DF to SQLite (avoid re-scrape per `fetch_odds` call)
+2. `soccerdata` in separate optional poetry group OR pytest upgrade
+3. Referee data scrape (replace mock)
+4. Phase 3: FastAPI platform
 
 ### Open questions
 - None blocking Phase 1

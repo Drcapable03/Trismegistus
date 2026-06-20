@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import yaml
 
+from agents.injuries_agent import fetch_injuries
 from agents.odds_agent import fetch_odds
 from agents.news_agent import fetch_news
 from config.settings import today
@@ -92,22 +93,21 @@ def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: b
         city = _city_for_team(home_team, team_cities)
         rain, wind = _fetch_weather(city, date_str)
 
-        if date_obj.date() >= current_date.date():
-            home_sentiment = fetch_news(home_team, date_str)
-            away_sentiment = fetch_news(away_team, date_str)
-        else:
-            home_sentiment, away_sentiment = 0.1, 0.1
+        home_sentiment = fetch_news(home_team, date_str)
+        away_sentiment = fetch_news(away_team, date_str)
 
         odds = fetch_odds(home_team, away_team, date_str) or {"H": 0, "A": 0, "D": 0}
 
-        home_injuries = (
-            injuries_df[injuries_df["team"] == home_team]["status"].tolist()
-            if injuries_df is not None else []
-        )
-        away_injuries = (
-            injuries_df[injuries_df["team"] == away_team]["status"].tolist()
-            if injuries_df is not None else []
-        )
+        if injuries_df is not None and not injuries_df.empty:
+            home_injury_count = len(
+                injuries_df[injuries_df["team"] == home_team]["status"].tolist()
+            )
+            away_injury_count = len(
+                injuries_df[injuries_df["team"] == away_team]["status"].tolist()
+            )
+        else:
+            home_injury_count = fetch_injuries(home_team)
+            away_injury_count = fetch_injuries(away_team)
 
         record = {
             "HomeTeam": home_team,
@@ -117,8 +117,8 @@ def get_chaos_data(matches, injuries_df=None, use_cache: bool = True, refresh: b
             "wind": wind,
             "home_x_sentiment": home_sentiment,
             "away_x_sentiment": away_sentiment,
-            "home_injuries": len(home_injuries),
-            "away_injuries": len(away_injuries),
+            "home_injuries": home_injury_count,
+            "away_injuries": away_injury_count,
             "odds_H": odds["H"],
             "odds_A": odds["A"],
             "odds_D": odds["D"],

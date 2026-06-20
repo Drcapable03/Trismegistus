@@ -1,0 +1,39 @@
+competition: "FIFA World Cup 2026"
+div_code: "WC26"
+
+oddsportal:
+  fixtures_url: "https://www.oddsportal.com/football/world/world-championship-2026/"
+  results_url: "https://www.oddsportal.com/football/world/world-championship-2026/results/"
+
+news:
+  query_template: "{team} World Cup 2026 football news"
+
+injuries:
+  query_template: "{team} World Cup 2026 injury squad"
+
+# National team -> host city for weather (USA/Mexico/Canada 2026)
+team_cities:
+  USA: "Los Angeles"
+  Mexico: "Mexico City"
+  Canada: "Toronto"
+  Brazil: "Brasilia"
+  Germany: "Berlin"
+  France: "Paris"
+  England: "London"
+  Spain: "Madrid"
+  Italy: "Rome"
+  Netherlands: "Amsterdam"
+  Argentina: "Buenos Aires"
+  Portugal: "Lisbon"
+  Belgium: "Brussels"
+  Croatia: "Zagreb"
+  Morocco: "Rabat"
+  Japan: "Tokyo"
+  South Korea: "Seoul"
+  Australia: "Sydney"
+  Scotland: "Glasgow"
+  Sweden: "Stockholm"
+  Turkey: "Istanbul"
+  Paraguay: "Asuncion"
+  Haiti: "Port-au-Prince"
+  Ivory Coast: "Abidjan"
