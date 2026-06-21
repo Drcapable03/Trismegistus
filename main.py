@@ -9,6 +9,7 @@ from config.settings import (
     league_div_codes,
     league_summary,
     league_urls,
+    per_league_edge_margins,
     today,
 )
 from predictors.blunder_sniffer import BlunderSniffer
@@ -100,7 +101,8 @@ def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool =
 
 def run_predict(
     confidence: float = 75.0,
-    limit: int = 50,
+    train_limit: int = 0,
+    predict_limit: int = 50,
     use_cache: bool = True,
     refresh_cache: bool = False,
     model_path: str | None = None,
@@ -110,41 +112,65 @@ def run_predict(
     matches = read_matches()
     future = get_future_matches(matches, div_filter=div_codes)
     if future.empty:
-        print("No upcoming league fixtures found.")
+        print("No upcoming league fixtures found. Run --ingest to refresh fixtures.csv.")
         return
 
-    print(f"Predict scope: Big 5 leagues {div_codes}")
-    print(f"Processing {len(future)} future matches")
-    forger = GameForger()
+    train_n = None if train_limit == 0 else train_limit
+    batch = future.head(predict_limit) if predict_limit > 0 else future
 
+    print(f"Predict scope: Big 5 leagues {div_codes}")
+    print(f"Upcoming fixtures: {len(future)} (scoring {len(batch)})")
+    margins = per_league_edge_margins()
+    if edge_margin is not None:
+        print(f"Edge filter: global ≥{edge_margin:.0%} vs closing implied")
+    elif margins:
+        print(f"Edge filter: per-league margins {margins}")
+    else:
+        print(f"Edge filter: global ≥{edge_margin_min():.0%} vs closing implied")
+    print(
+        "Live intel: ON (news/Reddit/YouTube)"
+        + (" — refreshing cache" if refresh_cache else " — cache + live fetch on miss")
+    )
+
+    forger = GameForger()
     if model_path:
         load_game_forger(forger, model_path)
-    else:
-        forger.train(
+        forger.prepare_training_data(
             injuries_df=DEFAULT_INJURIES,
-            limit=limit,
+            limit=train_n,
             use_cache=use_cache,
             refresh_cache=refresh_cache,
             div_filter=div_codes,
-            chaos_cache_only=not refresh_cache,
+            chaos_cache_only=True,
+        )
+        forger.fit_dc_baseline()
+    else:
+        forger.train(
+            injuries_df=DEFAULT_INJURIES,
+            limit=train_n,
+            use_cache=use_cache,
+            refresh_cache=refresh_cache,
+            div_filter=div_codes,
+            chaos_cache_only=True,
         )
 
     forger.prepare_prediction_data(
-        future.head(50),
+        batch,
         injuries_df=DEFAULT_INJURIES,
         use_cache=use_cache,
         refresh_cache=refresh_cache,
         div_filter=div_codes,
         chaos_cache_only=False,
     )
-    margin = edge_margin if edge_margin is not None else edge_margin_min()
-    print(f"Edge filter: only picks with ≥{margin:.0%} edge vs bookie implied")
     predictions = forger.predict(
         confidence_threshold=confidence,
-        edge_margin=margin,
+        edge_margin=edge_margin,
         use_simulation=False,
     )
-    print("\nPredictions:")
+    if not predictions:
+        print("\nNo edge-qualified picks for upcoming fixtures.")
+        return
+    print(f"\nLive picks ({len(predictions)}):")
     for pred in predictions:
         print(format_prediction(pred))
 
@@ -173,7 +199,11 @@ def main():
     )
     parser.add_argument(
         "--limit", type=int, default=200,
-        help="Max completed matches for training (0 = all ingested)",
+        help="Max completed matches for training/backtest (0 = all ingested)",
+    )
+    parser.add_argument(
+        "--predict-limit", type=int, default=50,
+        help="Max upcoming fixtures to score on --predict (0 = all)",
     )
     parser.add_argument("--save-model", action="store_true", help="Save trained model after backtest")
     parser.add_argument("--load-model", type=str, default=None, help="Path to saved model for --predict")
@@ -240,7 +270,8 @@ def main():
     if args.predict:
         run_predict(
             confidence=args.confidence,
-            limit=args.limit,
+            train_limit=args.limit if args.limit > 0 else 0,
+            predict_limit=args.predict_limit,
             use_cache=use_cache,
             refresh_cache=args.refresh_cache,
             model_path=args.load_model,

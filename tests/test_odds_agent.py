@@ -24,5 +24,5 @@ def test_fetch_odds_from_db():
 
     odds = fetch_odds_from_db("Spain", "Saudi Arabia")
     assert odds is not None
-    assert odds["source"] == "db"
+    assert odds["source"] == "db_opening"
     assert odds["H"] == 1.12

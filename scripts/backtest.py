@@ -61,14 +61,33 @@ def format_prediction(pred: dict) -> str:
         bookie = f", Bookie: {pred['bookie_pick']}"
     edge = pred.get("edge")
     edge_str = f", Edge: {edge:.1%}" if edge is not None else ""
+    margin = pred.get("edge_margin")
+    margin_str = f" (margin ≥{margin:.0%})" if margin is not None else ""
+    div = pred.get("div")
+    div_str = f" [{div}]" if div else ""
     probs = pred.get("probs")
     prob_str = ""
     if probs:
         prob_str = (
             f" [H {probs['H']:.0%} / D {probs['D']:.0%} / A {probs['A']:.0%}]"
         )
+    odds_str = ""
+    if pred.get("b365_close"):
+        h, d, a = pred["b365_close"]
+        odds_str = f", Closing: {h:.2f}/{d:.2f}/{a:.2f}"
+    elif pred.get("b365"):
+        h, d, a = pred["b365"]
+        odds_str = f", Odds: {h:.2f}/{d:.2f}/{a:.2f}"
+    intel = pred.get("intel") or {}
+    intel_str = ""
+    if intel.get("home_news_attention", 0) > 0 or intel.get("away_news_attention", 0) > 0:
+        intel_str = (
+            f", Intel attn H/A: {intel.get('home_news_attention', 0):.2f}/"
+            f"{intel.get('away_news_attention', 0):.2f}"
+        )
     return (
-        f"Match: {pred['home']} vs. {pred['away']}, {pred['date']}, "
+        f"Match: {pred['home']} vs. {pred['away']}, {pred['date']}{div_str}, "
         f"Model: {pred['outcome']}, {pred['confidence']:.1f}%, "
-        f"~{goals_str} xG{edge_str}{bookie}{prob_str}{blunder}"
+        f"~{goals_str} xG{edge_str}{margin_str}{bookie}{odds_str}{intel_str}"
+        f"{prob_str}{blunder}"
     )

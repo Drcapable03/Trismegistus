@@ -13,10 +13,11 @@ from config.settings import per_league_edge_margins
 from evaluation.kelly import kelly_simulation
 from evaluation.odds_lines import (
     b365_from_row,
-    closing_b365_from_row,
     line_movement,
-    opening_b365_from_row,
+    opening_and_closing_from_row,
+    resolve_b365_for_live,
 )
+from utils.chaos_cache import INTEL_COLS
 from predictors.dixon_coles_baseline import DixonColesBaseline
 from evaluation.metrics import print_metrics_summary, summarize_predictions
 from predictors.calibration import OutcomeCalibrator
@@ -62,15 +63,36 @@ def _date_str_col(df: pd.DataFrame) -> pd.Series:
     return df["Date"].astype(str)
 
 
+def _sync_live_odds_columns(data: pd.DataFrame) -> pd.DataFrame:
+    """Map live chaos odds into B365C* columns for closing-line edge."""
+    out = data.copy()
+    if "odds_H" not in out.columns:
+        return out
+    for b365c, chaos_col in (
+        ("B365CH", "odds_H"),
+        ("B365CD", "odds_D"),
+        ("B365CA", "odds_A"),
+    ):
+        if chaos_col not in out.columns:
+            continue
+        if b365c not in out.columns:
+            out[b365c] = out[chaos_col]
+        else:
+            out[b365c] = out[b365c].fillna(out[chaos_col])
+    return out
+
+
 def _add_implied_odds_features(data: pd.DataFrame) -> pd.DataFrame:
     """Bookie implied probs — used at inference only, not model features."""
     data = data.copy()
-    implied = data.apply(
-        lambda r: implied_probs_from_odds(
-            r.get("B365H", 0), r.get("B365D", 0), r.get("B365A", 0),
-        ),
-        axis=1,
-    )
+
+    def _implied(row: pd.Series) -> tuple[float, float, float]:
+        b365 = resolve_b365_for_live(row)
+        if b365 is None:
+            return (1 / 3, 1 / 3, 1 / 3)
+        return implied_probs_from_odds(*b365)
+
+    implied = data.apply(_implied, axis=1)
     data["implied_prob_D"] = [p[0] for p in implied]
     data["implied_prob_H"] = [p[1] for p in implied]
     data["implied_prob_A"] = [p[2] for p in implied]
@@ -116,6 +138,7 @@ def _merge_features(
         cache_only=chaos_cache_only,
     )
     data = data.merge(chaos, on=["HomeTeam", "AwayTeam", "Date"], how="left")
+    data = _sync_live_odds_columns(data)
     data = _add_div_features(data)
     return _add_implied_odds_features(data)
 
@@ -360,7 +383,9 @@ class GameForger:
         for col in (
             "B365H", "B365D", "B365A",
             "B365CH", "B365CD", "B365CA",
+            "odds_H", "odds_D", "odds_A",
             "Div",
+            *INTEL_COLS,
         ):
             if col in data.columns:
                 context_cols.append(col)
@@ -398,17 +423,21 @@ class GameForger:
         self.calibrator.fit(self.outcome_model, X_cal, y_cal)
         self.goals_model.fit(X_train_g, y_train_g)
 
-        if self.train_matches is not None and not self.train_matches.empty:
-            divs = None
-            meta_filter = self.training_metadata.get("div_filter")
-            if isinstance(meta_filter, list):
-                divs = meta_filter
-            self.dc_baseline.fit(self.train_matches, div_codes=divs)
-
         raw_preds = self.outcome_model.predict(X_fit)
         raw_accuracy = (raw_preds == y_fit).mean() * 100
         cal_status = "on" if self.calibrator.is_fitted else "skipped"
         print(f"Residual model train accuracy: {raw_accuracy:.1f}% (calibration {cal_status})")
+        self.fit_dc_baseline()
+
+    def fit_dc_baseline(self) -> None:
+        if self.train_matches is None or self.train_matches.empty:
+            return
+        divs = None
+        meta = getattr(self, "training_metadata", {}) or {}
+        div_filter = meta.get("div_filter")
+        if isinstance(div_filter, list):
+            divs = div_filter
+        self.dc_baseline.fit(self.train_matches, div_codes=divs)
 
     def _raw_model_probs(self, outcome_features) -> np.ndarray:
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
@@ -621,7 +650,10 @@ class GameForger:
 
         for i in range(len(X_outcome)):
             row = context.iloc[i]
-            b365 = b365_from_row(row)
+            div = row.get("Div")
+            b365 = resolve_b365_for_live(row)
+            b365_open, b365_close = opening_and_closing_from_row(row)
+            margin_used = self._edge_margin_for_div(div, edge_margin)
             goals_df = pd.DataFrame([X_goals.iloc[i]], columns=self.goals_features)
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
 
@@ -631,7 +663,7 @@ class GameForger:
                 None,
                 edge_margin,
                 require_edge=True,
-                div=row.get("Div"),
+                div=div,
                 home_team=row["HomeTeam"],
                 away_team=row["AwayTeam"],
             )
@@ -661,18 +693,30 @@ class GameForger:
             if b365 is not None:
                 bookie_pick = OUTCOME_LABELS[bookie_favorite(*b365)]
 
+            intel = {
+                col: float(row[col])
+                for col in INTEL_COLS
+                if col in row.index and pd.notna(row[col])
+            }
             results.append({
                 "home": row["HomeTeam"],
                 "away": row["AwayTeam"],
                 "date": row["Date"],
+                "div": div,
                 "outcome": OUTCOME_LABELS[pred],
                 "outcome_code": pred,
                 "confidence": confidence,
                 "edge": edge,
+                "edge_margin": margin_used,
                 "expected_goals": expected_goals,
                 "total_goals": total_goals,
                 "probs": {"H": float(final[1]), "D": float(final[0]), "A": float(final[2])},
                 "bookie_pick": bookie_pick,
+                "b365": b365,
+                "b365_open": b365_open,
+                "b365_close": b365_close or b365,
+                "line_movement": line_movement(row),
+                "intel": intel,
             })
         margin_label = (
             f"{edge_margin:.0%}"

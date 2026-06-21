@@ -40,6 +40,33 @@ def b365_from_row(row: pd.Series, prefer_closing: bool = True) -> tuple[float, f
     return opening_b365_from_row(row)
 
 
+def _tuple_from_chaos_odds(row: pd.Series) -> tuple[float, float, float] | None:
+    cols = ("odds_H", "odds_D", "odds_A")
+    if not set(cols).issubset(row.index):
+        return None
+    return _tuple_from_cols(row, cols)
+
+
+def resolve_b365_for_live(row: pd.Series) -> tuple[float, float, float] | None:
+    """Closing/current line: B365C* → live chaos odds → opening B365*."""
+    closing = closing_b365_from_row(row)
+    if closing is not None:
+        return closing
+    chaos = _tuple_from_chaos_odds(row)
+    if chaos is not None:
+        return chaos
+    return opening_b365_from_row(row)
+
+
+def opening_and_closing_from_row(
+    row: pd.Series,
+) -> tuple[tuple[float, float, float] | None, tuple[float, float, float] | None]:
+    """Return (opening, closing/current) Bet365 tuples when available."""
+    opening = opening_b365_from_row(row)
+    closing = closing_b365_from_row(row) or _tuple_from_chaos_odds(row)
+    return opening, closing
+
+
 def line_movement(row: pd.Series) -> dict[str, float] | None:
     """Implied-prob shift (closing minus opening) per outcome code 0=D, 1=H, 2=A."""
     opening = opening_b365_from_row(row)

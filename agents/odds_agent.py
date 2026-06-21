@@ -27,27 +27,49 @@ def _match_names(home: str, away: str, df: pd.DataFrame) -> pd.Series | None:
     return fuzzy.iloc[0] if not fuzzy.empty else None
 
 
-def fetch_odds_from_db(home_team: str, away_team: str, date: str | None = None) -> dict | None:
-    """Use B365 odds already stored in matches (ingested fixtures/results)."""
+def _load_odds_rows(home_team: str, away_team: str) -> pd.DataFrame:
+    base_cols = ["HomeTeam", "AwayTeam", "Date", "B365H", "B365D", "B365A"]
+    close_cols = ["B365CH", "B365CD", "B365CA"]
     try:
         df = pd.read_sql(
-            """
-            SELECT HomeTeam, AwayTeam, Date, B365H, B365D, B365A
+            f"""
+            SELECT {", ".join(base_cols + close_cols)}
             FROM matches
             WHERE HomeTeam = :h AND AwayTeam = :a
             """,
             engine,
             params={"h": home_team, "a": away_team},
         )
-        if df.empty:
-            h, a = home_team.lower(), away_team.lower()
-            all_df = pd.read_sql(
-                "SELECT HomeTeam, AwayTeam, Date, B365H, B365D, B365A FROM matches",
-                engine,
-            )
-            df = all_df[
-                all_df["HomeTeam"].str.lower().eq(h) & all_df["AwayTeam"].str.lower().eq(a)
-            ]
+    except Exception:
+        df = pd.read_sql(
+            f"""
+            SELECT {", ".join(base_cols)}
+            FROM matches
+            WHERE HomeTeam = :h AND AwayTeam = :a
+            """,
+            engine,
+            params={"h": home_team, "a": away_team},
+        )
+    if not df.empty:
+        return df
+
+    h, a = home_team.lower(), away_team.lower()
+    try:
+        all_df = pd.read_sql(
+            f"SELECT {', '.join(base_cols + close_cols)} FROM matches",
+            engine,
+        )
+    except Exception:
+        all_df = pd.read_sql(f"SELECT {', '.join(base_cols)} FROM matches", engine)
+    return all_df[
+        all_df["HomeTeam"].str.lower().eq(h) & all_df["AwayTeam"].str.lower().eq(a)
+    ]
+
+
+def fetch_odds_from_db(home_team: str, away_team: str, date: str | None = None) -> dict | None:
+    """Use B365 opening/closing odds stored in matches (ingested fixtures/results)."""
+    try:
+        df = _load_odds_rows(home_team, away_team)
         if df.empty:
             return None
 
@@ -56,15 +78,32 @@ def fetch_odds_from_db(home_team: str, away_team: str, date: str | None = None) 
             if not dated.empty:
                 df = dated
 
-        row = df.dropna(subset=["B365H", "B365D", "B365A"], how="any").iloc[-1]
-        if row[["B365H", "B365D", "B365A"]].le(0).any():
+        row = df.iloc[-1]
+        opening = None
+        if pd.notna(row.get("B365H")) and pd.notna(row.get("B365D")) and pd.notna(row.get("B365A")):
+            if min(row["B365H"], row["B365D"], row["B365A"]) > 0:
+                opening = (float(row["B365H"]), float(row["B365D"]), float(row["B365A"]))
+
+        closing = None
+        if pd.notna(row.get("B365CH")) and pd.notna(row.get("B365CD")) and pd.notna(row.get("B365CA")):
+            if min(row["B365CH"], row["B365CD"], row["B365CA"]) > 0:
+                closing = (float(row["B365CH"]), float(row["B365CD"]), float(row["B365CA"]))
+
+        current = closing or opening
+        if current is None:
             return None
-        return {
-            "H": float(row["B365H"]),
-            "D": float(row["B365D"]),
-            "A": float(row["B365A"]),
-            "source": "db",
+        h, d, a = current
+        out = {
+            "H": h,
+            "D": d,
+            "A": a,
+            "source": "db_closing" if closing else "db_opening",
         }
+        if opening:
+            out["open_H"], out["open_D"], out["open_A"] = opening
+        if closing:
+            out["close_H"], out["close_D"], out["close_A"] = closing
+        return out
     except Exception as e:
         print(f"DB odds lookup failed: {e}")
         return None
@@ -141,7 +180,10 @@ def fetch_odds(
     """DB (ingested B365) → cached/live OddsPortal scrape → The Odds API."""
     db_odds = fetch_odds_from_db(home_team, away_team, date)
     if db_odds:
-        print(f"Odds via DB: {home_team} vs {away_team} -> H={db_odds['H']}")
+        print(
+            f"Odds via DB ({db_odds['source']}): {home_team} vs {away_team} "
+            f"-> H={db_odds['H']}"
+        )
         return db_odds
 
     if _scrapling_enabled():
