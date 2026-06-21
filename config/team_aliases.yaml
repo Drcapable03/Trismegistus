@@ -1,0 +1,127 @@
+# football-data.co.uk HomeTeam name -> external source names
+understat:
+  Man United: Manchester United
+  Man City: Manchester City
+  Nott'm Forest: Nottingham Forest
+  Wolves: Wolverhampton Wanderers
+  Paris SG: Paris Saint-Germain
+  Ein Frankfurt: Eintracht Frankfurt
+  Ath Madrid: Atletico Madrid
+  Ath Bilbao: Athletic Club
+  M'gladbach: Borussia M.Gladbach
+  Bayern Munich: Bayern Munich
+  RB Leipzig: RasenBallsport Leipzig
+  Inter: Inter
+  Milan: AC Milan
+  Tottenham: Tottenham
+  West Ham: West Ham
+  Newcastle: Newcastle United
+  Brighton: Brighton
+  Leicester: Leicester
+  Leeds: Leeds
+  Everton: Everton
+  Fulham: Fulham
+  Brentford: Brentford
+  Bournemouth: Bournemouth
+  Crystal Palace: Crystal Palace
+  Aston Villa: Aston Villa
+  Arsenal: Arsenal
+  Chelsea: Chelsea
+  Liverpool: Liverpool
+  Barcelona: Barcelona
+  Real Madrid: Real Madrid
+  Sociedad: Real Sociedad
+  Betis: Real Betis
+  Celta: Celta Vigo
+  Vallecano: Rayo Vallecano
+  Alaves: Alaves
+  Dortmund: Borussia Dortmund
+  Leverkusen: Bayer Leverkusen
+  Hoffenheim: Hoffenheim
+  Stuttgart: VfB Stuttgart
+  Werder Bremen: Werder Bremen
+  Wolfsburg: Wolfsburg
+  Freiburg: Freiburg
+  Mainz: Mainz 05
+  Augsburg: Augsburg
+  Union Berlin: Union Berlin
+  Juventus: Juventus
+  Napoli: Napoli
+  Roma: Roma
+  Lazio: Lazio
+  Atalanta: Atalanta
+  Fiorentina: Fiorentina
+  Bologna: Bologna
+  Torino: Torino
+  Lyon: Lyon
+  Marseille: Marseille
+  Lille: Lille
+  Monaco: Monaco
+  Nice: Nice
+  Lens: Lens
+  Rennes: Rennes
+  Strasbourg: Strasbourg
+  Nantes: Nantes
+  Toulouse: Toulouse
+  Brest: Brest
+
+club_elo:
+  Man United: Man United
+  Man City: Man City
+  Nott'm Forest: Nott'm Forest
+  Paris SG: Paris SG
+  Ein Frankfurt: Frankfurt
+  Ath Madrid: Ath Madrid
+  Ath Bilbao: Ath Bilbao
+  M'gladbach: M'gladbach
+  Wolves: Wolves
+  Tottenham: Tottenham
+  West Ham: West Ham
+  Brighton: Brighton
+  Leicester: Leicester
+  Leeds: Leeds
+  Everton: Everton
+  Fulham: Fulham
+  Brentford: Brentford
+  Bournemouth: Bournemouth
+  Crystal Palace: Crystal Palace
+  Aston Villa: Aston Villa
+  Arsenal: Arsenal
+  Chelsea: Chelsea
+  Liverpool: Liverpool
+  Barcelona: Barcelona
+  Real Madrid: Real Madrid
+  Sociedad: Sociedad
+  Betis: Betis
+  Celta: Celta
+  Vallecano: Vallecano
+  Alaves: Alaves
+  Dortmund: Dortmund
+  Leverkusen: Leverkusen
+  Hoffenheim: Hoffenheim
+  Stuttgart: Stuttgart
+  Werder Bremen: Werder Bremen
+  Wolfsburg: Wolfsburg
+  Freiburg: Freiburg
+  Mainz: Mainz
+  Augsburg: Augsburg
+  Union Berlin: Union Berlin
+  Juventus: Juventus
+  Napoli: Napoli
+  Roma: Roma
+  Lazio: Lazio
+  Atalanta: Atalanta
+  Fiorentina: Fiorentina
+  Bologna: Bologna
+  Torino: Torino
+  Lyon: Lyon
+  Marseille: Marseille
+  Lille: Lille
+  Monaco: Monaco
+  Nice: Nice
+  Lens: Lens
+  Rennes: Rennes
+  Strasbourg: Strasbourg
+  Nantes: Nantes
+  Toulouse: Toulouse
+  Brest: Brest

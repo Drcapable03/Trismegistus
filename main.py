@@ -192,6 +192,12 @@ def main():
         "--build-cities", action="store_true",
         help="Regenerate config/team_cities.yaml for Big 5 teams",
     )
+    parser.add_argument("--fetch-xg", action="store_true", help="Cache Understat match xG into SQLite")
+    parser.add_argument("--fetch-elo", action="store_true", help="Cache Club Elo ratings into SQLite")
+    parser.add_argument(
+        "--tune-edge", action="store_true",
+        help="Grid-search edge margin on selective holdout ROI",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -199,6 +205,7 @@ def main():
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
+        args.fetch_xg, args.fetch_elo, args.tune_edge,
     ])
 
     print("Trismegistus is alive!")
@@ -248,6 +255,15 @@ def main():
     if args.build_cities:
         from scripts.build_team_cities import write_team_cities
         write_team_cities()
+    if args.fetch_xg:
+        from scripts.fetch_xg import fetch_xg
+        fetch_xg()
+    if args.fetch_elo:
+        from scripts.fetch_elo import fetch_elo
+        fetch_elo(div_filter=league_div_codes())
+    if args.tune_edge:
+        from scripts.tune_edge import tune_edge
+        tune_edge(limit=args.limit, use_cache=use_cache)
     print("Done.")
 
 

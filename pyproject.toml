@@ -19,6 +19,8 @@ pyyaml = "^6.0.2"
 joblib = "^1.4.2"
 scrapling = {version = "^0.4.9", extras = ["fetchers"]}
 curl-cffi = "^0.15.0"
+penaltyblog = "^1.11.0"
+understatapi = "^0.7.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

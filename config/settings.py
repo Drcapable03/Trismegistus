@@ -87,6 +87,40 @@ def pit_cache_sentiment() -> bool:
     return get_env("PIT_CACHE_SENTIMENT", "true").lower() in {"1", "true", "yes"}
 
 
+def devig_method() -> str:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    method = str(model_cfg.get("devig_method", get_env("DEVIG_METHOD", "shin"))).lower()
+    return method if method in {"shin", "proportional"} else "shin"
+
+
+def understat_league_map() -> dict[str, str]:
+    cfg = load_leagues_config()
+    return {
+        "E0": "EPL",
+        "SP1": "La_Liga",
+        "D1": "Bundesliga",
+        "I1": "Serie_A",
+        "F1": "Ligue_1",
+        **(cfg.get("understat_leagues") or {}),
+    }
+
+
+def historical_understat_seasons() -> list[str]:
+    cfg = load_leagues_config()
+    if cfg.get("understat_seasons"):
+        return [str(s) for s in cfg["understat_seasons"]]
+    seasons = cfg.get("historical_seasons", [])
+    mapped = []
+    for s in seasons:
+        if len(str(s)) == 4 and str(s).isdigit():
+            mapped.append(str(2000 + int(str(s)[:2])))  # 2425 -> 2024
+    current = cfg.get("season", "2526")
+    if len(str(current)) == 4:
+        mapped.append(str(2000 + int(str(current)[:2])))  # 2526 -> 2025
+    return sorted(set(mapped)) or ["2024", "2025"]
+
+
 def edge_margin_min() -> float:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}
