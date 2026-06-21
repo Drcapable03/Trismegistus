@@ -20,7 +20,9 @@ def save_game_forger(forger, tag: str = "game_forger") -> Path:
         "goals_features": forger.goals_features,
         "sim_runs": forger.sim_runs,
         "bookie_blend_weight": forger.bookie_blend_weight,
+        "per_league_blend": getattr(forger, "per_league_blend", {}),
         "edge_margin": forger.edge_margin,
+        "calibrator": getattr(forger, "calibrator", None),
         "training_metadata": getattr(forger, "training_metadata", {}),
     }
     joblib.dump(payload, path)
@@ -42,8 +44,12 @@ def load_game_forger(forger, path: str | Path) -> None:
     forger.sim_runs = payload.get("sim_runs", forger.sim_runs)
     if "bookie_blend_weight" in payload:
         forger.bookie_blend_weight = float(payload["bookie_blend_weight"])
+    if "per_league_blend" in payload:
+        forger.per_league_blend = dict(payload["per_league_blend"])
     if "edge_margin" in payload:
         forger.edge_margin = float(payload["edge_margin"])
+    if "calibrator" in payload and payload["calibrator"] is not None:
+        forger.calibrator = payload["calibrator"]
     if "training_metadata" in payload:
         forger.training_metadata = payload["training_metadata"]
     print(f"Loaded model from {path}")

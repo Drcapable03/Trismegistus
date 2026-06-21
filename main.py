@@ -90,8 +90,7 @@ def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool =
         )
 
     sniffer = BlunderSniffer()
-    sniffer.train()
-    blunders = sniffer.find_blunders(limit=10)
+    blunders = sniffer.find_blunders(forger, limit=10, edge_margin=margin)
     if blunders:
         print("\nBookie Blunders (BlunderSniffer):")
         for b in blunders:
@@ -181,13 +180,17 @@ def main():
     parser.add_argument("--worldcup-ingest", action="store_true", help="Scrape and ingest World Cup matches")
     parser.add_argument("--worldcup-predict", action="store_true", help="Predict upcoming World Cup fixtures")
     parser.add_argument("--tune-blend", action="store_true", help="Grid-search bookie blend weight on league holdout")
+    parser.add_argument(
+        "--tune-leagues", action="store_true",
+        help="Tune per-league bookie blend weights on holdout subsets",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
     run_all = not any([
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
-        args.tune_blend,
+        args.tune_blend, args.tune_leagues,
     ])
 
     print("Trismegistus is alive!")
@@ -228,6 +231,9 @@ def main():
     if args.tune_blend:
         from scripts.tune_blend import tune_blend
         tune_blend(limit=args.limit, use_cache=use_cache)
+    if args.tune_leagues:
+        from scripts.tune_leagues import tune_leagues
+        tune_leagues(limit=args.limit, use_cache=use_cache)
     print("Done.")
 
 

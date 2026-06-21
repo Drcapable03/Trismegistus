@@ -18,6 +18,12 @@ fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
 model:
   bookie_blend_weight: 0.1
   # Min edge vs bookie implied prob to emit a pick (Phase 2 selective betting)
+  per_league_blend:
+    D1: 0.6
+    E0: 0.25
+    F1: 1.0
+    I1: 0.0
+    SP1: 0.55
   edge_margin_min: 0.05
 
 leagues:

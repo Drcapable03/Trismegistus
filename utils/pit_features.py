@@ -13,6 +13,13 @@ FORM_DEFAULTS = {
     "avg_goals_scored_away": 1.20,
     "avg_goals_conceded_away": 1.40,
 }
+SHOT_DEFAULTS = {
+    "avg_shots_on_target_home": 4.5,
+    "avg_shots_on_target_away": 4.0,
+    "avg_shots_home": 12.0,
+    "avg_shots_away": 11.0,
+}
+SHOT_COLS = ("HS", "AS", "HST", "AST")
 
 
 def _parse_dt(series: pd.Series) -> pd.Series:
@@ -45,6 +52,35 @@ def _team_form_prior(history: pd.DataFrame, team: str, before: pd.Timestamp) -> 
     }
 
 
+def _team_shot_prior(history: pd.DataFrame, team: str, before: pd.Timestamp) -> dict[str, float]:
+    prior = history[history["_dt"] < before]
+    home = prior[prior["HomeTeam"] == team]
+    away = prior[prior["AwayTeam"] == team]
+
+    def _mean_col(frames: list[pd.Series], default: float) -> float:
+        parts = [s for s in frames if not s.empty]
+        if not parts:
+            return default
+        return float(pd.concat(parts, ignore_index=True).mean())
+
+    return {
+        "avg_shots_on_target": _mean_col(
+            [
+                home["HST"] if "HST" in home.columns else pd.Series(dtype=float),
+                away["AST"] if "AST" in away.columns else pd.Series(dtype=float),
+            ],
+            SHOT_DEFAULTS["avg_shots_on_target_home"],
+        ),
+        "avg_shots": _mean_col(
+            [
+                home["HS"] if "HS" in home.columns else pd.Series(dtype=float),
+                away["AS"] if "AS" in away.columns else pd.Series(dtype=float),
+            ],
+            SHOT_DEFAULTS["avg_shots_home"],
+        ),
+    }
+
+
 def compute_pit_form_and_h2h(
     target: pd.DataFrame,
     history: pd.DataFrame,
@@ -58,7 +94,10 @@ def compute_pit_form_and_h2h(
 
     form_home_scored, form_home_conceded = [], []
     form_away_scored, form_away_conceded = [], []
+    shots_home, shots_away = [], []
+    shots_total_home, shots_total_away = [], []
     h2h_win, h2h_hg, h2h_ag = [], [], []
+    has_shots = all(c in hist.columns for c in SHOT_COLS)
 
     for _, row in out.iterrows():
         dt = row["_dt"]
@@ -70,6 +109,14 @@ def compute_pit_form_and_h2h(
         form_home_conceded.append(hf["avg_goals_conceded"])
         form_away_scored.append(af["avg_goals_scored"])
         form_away_conceded.append(af["avg_goals_conceded"])
+
+        if has_shots:
+            hs = _team_shot_prior(hist, home, dt)
+            aws = _team_shot_prior(hist, away, dt)
+            shots_home.append(hs["avg_shots_on_target"])
+            shots_away.append(aws["avg_shots_on_target"])
+            shots_total_home.append(hs["avg_shots"])
+            shots_total_away.append(aws["avg_shots"])
 
         prior_h2h = hist[
             (hist["HomeTeam"] == home)
@@ -92,4 +139,9 @@ def compute_pit_form_and_h2h(
     out["h2h_home_win_pct"] = h2h_win
     out["h2h_avg_home_goals"] = h2h_hg
     out["h2h_avg_away_goals"] = h2h_ag
+    if has_shots:
+        out["avg_shots_on_target_home"] = shots_home
+        out["avg_shots_on_target_away"] = shots_away
+        out["avg_shots_home"] = shots_total_home
+        out["avg_shots_away"] = shots_total_away
     return out.drop(columns=["_dt"])

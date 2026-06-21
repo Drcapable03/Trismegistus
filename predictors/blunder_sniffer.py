@@ -1,62 +1,64 @@
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LinearRegression
-from sqlalchemy import inspect
+"""Find matches where the model disagreed with the bookie and was right."""
 
-from utils.db import engine, read_matches
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from evaluation.implied_odds import bookie_favorite
+
+if TYPE_CHECKING:
+    from predictors.game_forger import GameForger
 
 
 class BlunderSniffer:
-    def __init__(self):
-        self.outcome_model = RandomForestClassifier(n_estimators=100, random_state=42)
-        self.goals_model = LinearRegression()
+    """Phase 3: uses trained GameForger edge picks, not static implied rules."""
 
-    def prepare_data(self):
-        matches = read_matches()
-        matches = matches[matches["FTR"].isin(["H", "D", "A"])]
-        form = (
-            pd.read_sql("SELECT * FROM team_form", engine)
-            if inspect(engine).has_table("team_form")
-            else pd.DataFrame()
+    def find_blunders(
+        self,
+        forger: GameForger,
+        limit: int = 10,
+        edge_margin: float | None = None,
+    ) -> list[str]:
+        margin = edge_margin if edge_margin is not None else forger.edge_margin
+        preds = forger.backtest_on_holdout(
+            confidence_threshold=0.0,
+            edge_margin=margin,
+            require_edge=True,
         )
+        hits = []
+        for p in preds:
+            if p.get("bookie_code") is None:
+                continue
+            model_right = p["outcome_code"] == p["actual_code"]
+            disagreed = p["outcome_code"] != p["bookie_code"]
+            if model_right and disagreed:
+                hits.append(p)
 
-        home_form = form.rename(columns={"team": "HomeTeam"})
-        away_form = form.rename(columns={"team": "AwayTeam"})
-        data = matches.merge(home_form, on="HomeTeam", how="left").merge(
-            away_form, on="AwayTeam", how="left", suffixes=("_home", "_away"),
-        )
-
-        X_outcome = data[[
-            "avg_goals_scored_home", "avg_goals_scored_away",
-            "avg_goals_conceded_home", "avg_goals_conceded_away",
-            "B365H", "B365A", "B365D",
-        ]].fillna(0)
-        y_outcome = data["FTR"].map({"H": 1, "A": 2, "D": 0})
-        X_goals = data[[
-            "avg_goals_scored_home", "avg_goals_scored_away",
-            "avg_goals_conceded_home", "avg_goals_conceded_away",
-        ]].fillna(0)
-        y_goals = data["FTHG"] + data["FTAG"]
-
-        data["implied_prob_H"] = 1 / data["B365H"].replace(0, float("nan"))
-        data["odds_error"] = (data["FTR"] != "H") & (data["implied_prob_H"] > 0.7)
-
-        return X_outcome, y_outcome, X_goals, y_goals, data[
-            ["HomeTeam", "AwayTeam", "Date", "FTR", "odds_error"]
-        ]
-
-    def train(self):
-        X_outcome, y_outcome, X_goals, y_goals, _ = self.prepare_data()
-        self.outcome_model.fit(X_outcome, y_outcome)
-        self.goals_model.fit(X_goals, y_goals)
-
-    def find_blunders(self, limit: int = 10) -> list[str]:
-        _, _, _, _, context = self.prepare_data()
-        blunders = context[context["odds_error"]].head(limit)
+        hits.sort(key=lambda x: x.get("edge", 0), reverse=True)
         results = []
-        for _, row in blunders.iterrows():
+        for p in hits[:limit]:
             results.append(
-                f"{row['HomeTeam']} vs {row['AwayTeam']} ({row['Date']}): "
-                f"bookie favored home (>70%), actual={row['FTR']}"
+                f"{p['home']} vs {p['away']} ({p['date']}) [{p.get('div', '?')}]: "
+                f"model={p['outcome']} (edge {p.get('edge', 0):.1%}) beat "
+                f"bookie={p.get('bookie_pick', '?')} (actual={p['actual_code']})"
             )
         return results
+
+    def find_bookie_fav_failures(self, limit: int = 10) -> list[str]:
+        """Legacy helper: heavy home favorites that lost (reference only)."""
+        from utils.db import read_matches
+
+        matches = read_matches()
+        completed = matches[matches["FTR"].isin(["H", "D", "A"])].copy()
+        if completed.empty or "B365H" not in completed.columns:
+            return []
+
+        completed["implied_prob_H"] = 1 / completed["B365H"].replace(0, float("nan"))
+        blunders = completed[
+            (completed["FTR"] != "H") & (completed["implied_prob_H"] > 0.7)
+        ].head(limit)
+        return [
+            f"{r['HomeTeam']} vs {r['AwayTeam']} ({r['Date']}): "
+            f"bookie favored home (>70%), actual={r['FTR']}"
+            for _, r in blunders.iterrows()
+        ]

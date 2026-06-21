@@ -99,6 +99,41 @@ def set_edge_margin_min(margin: float) -> None:
     config_path.write_text(text, encoding="utf-8")
 
 
+def per_league_blend_weights() -> dict[str, float]:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    raw = model_cfg.get("per_league_blend") or {}
+    return {str(k): float(v) for k, v in raw.items()}
+
+
+def set_per_league_blend_weights(weights: dict[str, float]) -> None:
+    """Write per_league_blend block under model: in leagues.yaml."""
+    import re
+
+    config_path = ROOT / "config" / "leagues.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    lines = ["  per_league_blend:"]
+    for code, w in sorted(weights.items()):
+        lines.append(f"    {code}: {round(float(w), 3)}")
+    block = "\n".join(lines) + "\n"
+
+    if re.search(r"^\s*per_league_blend:\s*$", text, re.MULTILINE):
+        text = re.sub(
+            r"^\s*per_league_blend:\s*\n(?:\s+\w+:\s*[\d.]+\n)*",
+            block,
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        text = text.replace(
+            "  edge_margin_min:",
+            f"{block}  edge_margin_min:",
+            1,
+        )
+    config_path.write_text(text, encoding="utf-8")
+
+
 def bookie_blend_weight() -> float:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}
