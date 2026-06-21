@@ -27,6 +27,12 @@ model:
     F1: 1.0
     I1: 0.0
     SP1: 0.55
+  per_league_edge_margin:
+    D1: 0.03
+    E0: 0.13
+    F1: 0.1
+    I1: 0.15
+    SP1: 0.07
   edge_margin_min: 0.1
 
 # Phase 5B: intel policy (news/reddit/youtube live-only; disabled in train by default)

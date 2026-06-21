@@ -171,7 +171,10 @@ def main():
         "--edge-margin", type=float, default=None,
         help="Min edge vs bookie implied prob to emit a pick (default from leagues.yaml)",
     )
-    parser.add_argument("--limit", type=int, default=200, help="Max completed matches for training")
+    parser.add_argument(
+        "--limit", type=int, default=200,
+        help="Max completed matches for training (0 = all ingested)",
+    )
     parser.add_argument("--save-model", action="store_true", help="Save trained model after backtest")
     parser.add_argument("--load-model", type=str, default=None, help="Path to saved model for --predict")
     parser.add_argument("--refresh-cache", action="store_true", help="Re-fetch chaos data ignoring cache")
