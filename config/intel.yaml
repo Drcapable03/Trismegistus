@@ -1,0 +1,25 @@
+# Phase 5B: live intel sources (disabled in training by default — see leagues.yaml chaos)
+
+news:
+  enabled: true
+  query_template: "{team} football news"
+
+reddit:
+  enabled: true
+  subreddits:
+    - soccer
+    - PremierLeague
+    - LaLiga
+    - Bundesliga
+    - SerieA
+    - Ligue1
+  search_limit: 15
+  comment_limit: 25
+
+youtube:
+  enabled: true
+  # Optional direct video URLs; otherwise Google discovers YouTube links via Scrapling
+  video_urls: []
+  search_query_template: "{team} {opponent} match preview"
+  comment_limit: 40
+  max_videos: 3

@@ -6,8 +6,14 @@ from predictors.game_forger import GameForger, _add_div_features
 def test_model_features_exclude_bookie():
     forger = GameForger()
     data = pd.DataFrame({
-        "home_x_sentiment": [0.1],
-        "away_x_sentiment": [0.2],
+        "home_news_attention": [0.1],
+        "away_news_attention": [0.2],
+        "home_news_sentiment": [0.5],
+        "away_news_sentiment": [0.5],
+        "home_reddit_sentiment": [0.5],
+        "away_reddit_sentiment": [0.5],
+        "home_youtube_sentiment": [0.5],
+        "away_youtube_sentiment": [0.5],
         "home_injuries": [1],
         "away_injuries": [0],
         "rain": [0.0],

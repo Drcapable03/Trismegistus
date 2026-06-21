@@ -7,18 +7,17 @@ import requests
 import yaml
 
 from agents.injuries_agent import fetch_injuries
+from agents.intel_agent import fetch_team_intel, intel_to_chaos_fields, stripped_intel_fields
 from agents.odds_agent import fetch_odds
-from agents.news_agent import fetch_news
-from config.settings import today, use_sentiment_in_train
-from utils.chaos_cache import cache_stats, get_cached, save_cached
+from config.settings import today, use_intel_in_train
+from utils.chaos_cache import INTEL_COLS, cache_stats, get_cached, save_cached
 
 TEAM_CITIES_PATH = Path(__file__).resolve().parent.parent / "config" / "team_cities.yaml"
 
 CHAOS_DEFAULTS = {
     "rain": 0.0,
     "wind": 0.0,
-    "home_x_sentiment": 0.0,
-    "away_x_sentiment": 0.0,
+    **stripped_intel_fields(),
     "home_injuries": 0,
     "away_injuries": 0,
 }
@@ -95,12 +94,20 @@ def _default_record(home_team: str, away_team: str, date_display: str, row: pd.S
     }
 
 
-def _apply_sentiment_policy(record: dict, match_dt: dt, training: bool) -> dict:
+def _apply_intel_policy(record: dict, match_dt: dt, training: bool) -> dict:
     out = dict(record)
-    if training and not use_sentiment_in_train():
-        out["home_x_sentiment"] = 0.0
-        out["away_x_sentiment"] = 0.0
+    if training and not use_intel_in_train():
+        out.update(stripped_intel_fields())
     return out
+
+
+def _chaos_output_keys() -> list[str]:
+    return [
+        "HomeTeam", "AwayTeam", "Date", "rain", "wind",
+        *INTEL_COLS,
+        "home_injuries", "away_injuries",
+        "odds_H", "odds_A", "odds_D",
+    ]
 
 
 def get_chaos_data(
@@ -120,31 +127,28 @@ def get_chaos_data(
     cache_misses = 0
     live_fetches = 0
     total = len(matches)
+    output_keys = _chaos_output_keys()
 
     for n, (_, row) in enumerate(matches.iterrows(), start=1):
         home_team, away_team, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
         date_obj, date_str, date_display = _normalize_date(date)
-        allow_sentiment = not (cache_only and not use_sentiment_in_train())
+        allow_intel = not (cache_only and not use_intel_in_train())
 
         if use_cache and not refresh:
             cached = get_cached(
                 home_team, away_team, date_display,
-                match_dt=date_obj, allow_sentiment=allow_sentiment,
+                match_dt=date_obj, allow_intel=allow_intel,
             )
             if cached:
                 cache_hits += 1
-                record = {k: cached[k] for k in [
-                    "HomeTeam", "AwayTeam", "Date", "rain", "wind",
-                    "home_x_sentiment", "away_x_sentiment", "home_injuries", "away_injuries",
-                    "odds_H", "odds_A", "odds_D",
-                ]}
-                chaos_data.append(_apply_sentiment_policy(record, date_obj, training=cache_only))
+                record = {k: cached[k] for k in output_keys}
+                chaos_data.append(_apply_intel_policy(record, date_obj, training=cache_only))
                 continue
 
         if cache_only:
             cache_misses += 1
             chaos_data.append(
-                _apply_sentiment_policy(
+                _apply_intel_policy(
                     _default_record(home_team, away_team, date_display, row),
                     date_obj,
                     training=True,
@@ -158,8 +162,8 @@ def get_chaos_data(
         city = _city_for_team(home_team, team_cities)
         rain, wind = _fetch_weather(city, date_str)
 
-        home_sentiment = fetch_news(home_team, date_str)
-        away_sentiment = fetch_news(away_team, date_str)
+        home_intel = fetch_team_intel(home_team, date_str, opponent=away_team)
+        away_intel = fetch_team_intel(away_team, date_str, opponent=home_team)
 
         odds = fetch_odds(home_team, away_team, date_str) or _odds_from_row(row)
 
@@ -180,8 +184,8 @@ def get_chaos_data(
             "Date": date_display,
             "rain": rain,
             "wind": wind,
-            "home_x_sentiment": home_sentiment,
-            "away_x_sentiment": away_sentiment,
+            **intel_to_chaos_fields("home", home_intel),
+            **intel_to_chaos_fields("away", away_intel),
             "home_injuries": home_injury_count,
             "away_injuries": away_injury_count,
             "odds_H": odds["H"],

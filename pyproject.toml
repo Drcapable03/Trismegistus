@@ -21,6 +21,9 @@ scrapling = {version = "^0.4.9", extras = ["fetchers"]}
 curl-cffi = "^0.15.0"
 penaltyblog = "^1.11.0"
 understatapi = "^0.7.1"
+vaderSentiment = "^3.3.2"
+praw = "^7.8.1"
+youtube-comment-downloader = "^0.1.76"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

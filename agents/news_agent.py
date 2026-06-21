@@ -1,47 +1,19 @@
-import os
+"""Legacy news entry point — delegates to intel_agent."""
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def _scrapling_enabled() -> bool:
-    return os.getenv("TRIS_USE_SCRAPLING", "true").lower() in {"1", "true", "yes"}
+from agents.intel_agent import fetch_team_intel
 
 
 def fetch_news_scraped(team: str, date: str | None = None) -> float:
-    from scrapers.news_scraper import scrape_team_news_sentiment
-    return scrape_team_news_sentiment(team)
+    intel = fetch_team_intel(team, date or "")
+    return intel["news_attention"]
 
 
 def fetch_news_api(team: str, date: str) -> float | None:
-    api_key = os.getenv("NEWS_API_KEY")
-    if not api_key:
-        return None
+    from agents.intel_agent import _fetch_news_api_attention
 
-    from newsapi import NewsApiClient
-    newsapi = NewsApiClient(api_key=api_key)
-    query = f"{team} football"
-    try:
-        articles = newsapi.get_everything(
-            q=query, from_param=date, to=date, language="en", sort_by="relevancy",
-        )
-        if articles["articles"]:
-            return min(1.0, 0.1 + 0.05 * len(articles["articles"]))
-        return 0.1
-    except Exception as e:
-        print(f"NewsAPI failed: {e}")
-        return None
+    return _fetch_news_api_attention(team, date)
 
 
 def fetch_news(team: str, date: str) -> float:
-    """Scrapling Google News first, NewsAPI fallback."""
-    if _scrapling_enabled():
-        return fetch_news_scraped(team, date)
-
-    api_result = fetch_news_api(team, date)
-    if api_result is not None:
-        return api_result
-
-    print("No news source available — using neutral sentiment")
-    return 0.1
+    """Return news_attention (legacy float API)."""
+    return fetch_news_scraped(team, date)

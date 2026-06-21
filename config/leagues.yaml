@@ -27,10 +27,10 @@ model:
     SP1: 0.55
   edge_margin_min: 0.1
 
-# Phase 4: chaos/sentiment policy (news is live-only; disabled in train by default)
+# Phase 5B: intel policy (news/reddit/youtube live-only; disabled in train by default)
 chaos:
-  use_sentiment_in_train: false
-  pit_cache_sentiment: true
+  use_intel_in_train: false
+  pit_cache_intel: true
 
 leagues:
   # --- Active (Big 5) ---

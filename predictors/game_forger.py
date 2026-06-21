@@ -186,7 +186,10 @@ class GameForger:
     def _model_feature_columns(self, data: pd.DataFrame) -> tuple[list[str], list[str]]:
         """Residual features — no raw bookie odds in the learner."""
         outcome_cols = [
-            "home_x_sentiment", "away_x_sentiment",
+            "home_news_attention", "away_news_attention",
+            "home_news_sentiment", "away_news_sentiment",
+            "home_reddit_sentiment", "away_reddit_sentiment",
+            "home_youtube_sentiment", "away_youtube_sentiment",
             "home_injuries", "away_injuries",
             "rain", "wind",
             "h2h_home_win_pct", "h2h_avg_home_goals", "h2h_avg_away_goals",

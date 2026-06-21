@@ -73,18 +73,44 @@ def chaos_config() -> dict:
     return cfg.get("chaos") or {}
 
 
-def use_sentiment_in_train() -> bool:
+def use_intel_in_train() -> bool:
     chaos = chaos_config()
+    if "use_intel_in_train" in chaos:
+        return bool(chaos["use_intel_in_train"])
     if "use_sentiment_in_train" in chaos:
         return bool(chaos["use_sentiment_in_train"])
-    return get_env("USE_SENTIMENT_IN_TRAIN", "false").lower() in {"1", "true", "yes"}
+    return get_env("USE_INTEL_IN_TRAIN", get_env("USE_SENTIMENT_IN_TRAIN", "false")).lower() in {
+        "1", "true", "yes",
+    }
+
+
+def use_sentiment_in_train() -> bool:
+    """Legacy alias for use_intel_in_train."""
+    return use_intel_in_train()
+
+
+def pit_cache_intel() -> bool:
+    chaos = chaos_config()
+    if "pit_cache_intel" in chaos:
+        return bool(chaos["pit_cache_intel"])
+    if "pit_cache_sentiment" in chaos:
+        return bool(chaos["pit_cache_sentiment"])
+    return get_env("PIT_CACHE_INTEL", get_env("PIT_CACHE_SENTIMENT", "true")).lower() in {
+        "1", "true", "yes",
+    }
 
 
 def pit_cache_sentiment() -> bool:
-    chaos = chaos_config()
-    if "pit_cache_sentiment" in chaos:
-        return bool(chaos["pit_cache_sentiment"])
-    return get_env("PIT_CACHE_SENTIMENT", "true").lower() in {"1", "true", "yes"}
+    """Legacy alias for pit_cache_intel."""
+    return pit_cache_intel()
+
+
+def intel_config() -> dict:
+    path = ROOT / "config" / "intel.yaml"
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 def devig_method() -> str:
