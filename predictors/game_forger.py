@@ -5,8 +5,19 @@ from sklearn.linear_model import PoissonRegressor
 from sqlalchemy import inspect
 
 from config.settings import bookie_blend_weight as default_bookie_blend_weight
+from config.settings import dixon_coles_blend_weight as default_dc_blend_weight
 from config.settings import edge_margin_min as default_edge_margin
+from config.settings import kelly_fraction as default_kelly_fraction
 from config.settings import per_league_blend_weights
+from config.settings import per_league_edge_margins
+from evaluation.kelly import kelly_simulation
+from evaluation.odds_lines import (
+    b365_from_row,
+    closing_b365_from_row,
+    line_movement,
+    opening_b365_from_row,
+)
+from predictors.dixon_coles_baseline import DixonColesBaseline
 from evaluation.metrics import print_metrics_summary, summarize_predictions
 from predictors.calibration import OutcomeCalibrator
 from evaluation.edge import (
@@ -109,15 +120,6 @@ def _merge_features(
     return _add_implied_odds_features(data)
 
 
-def _b365_from_row(row: pd.Series) -> tuple[float, float, float] | None:
-    if not {"B365H", "B365D", "B365A"}.issubset(row.index):
-        return None
-    h, d, a = row["B365H"], row["B365D"], row["B365A"]
-    if pd.isna(h) or pd.isna(d) or pd.isna(a) or min(h, d, a) <= 0:
-        return None
-    return float(h), float(d), float(a)
-
-
 def _sort_chronologically(data: pd.DataFrame) -> pd.DataFrame:
     dt = pd.to_datetime(data["Date"], format="%d/%m/%Y", errors="coerce")
     if dt.isna().all():
@@ -162,9 +164,14 @@ class GameForger:
             else float(bookie_blend_weight)
         )
         self.per_league_blend = per_league_blend_weights()
+        self.per_league_edge_margin = per_league_edge_margins()
+        self.dc_blend_weight = default_dc_blend_weight()
+        self.kelly_fraction = default_kelly_fraction()
         self.edge_margin = (
             default_edge_margin() if edge_margin is None else float(edge_margin)
         )
+        self.dc_baseline = DixonColesBaseline()
+        self.train_matches: pd.DataFrame | None = None
         self.calibrator = OutcomeCalibrator()
         self.outcome_model = GradientBoostingClassifier(
             n_estimators=150, learning_rate=0.01, max_depth=3,
@@ -218,6 +225,13 @@ class GameForger:
             return float(self.per_league_blend[div])
         return self.bookie_blend_weight
 
+    def _edge_margin_for_div(self, div: str | None, edge_margin: float | None) -> float:
+        if edge_margin is not None:
+            return float(edge_margin)
+        if div and div in self.per_league_edge_margin:
+            return float(self.per_league_edge_margin[div])
+        return self.edge_margin
+
     def prepare_training_data(
         self,
         injuries_df=None,
@@ -265,8 +279,14 @@ class GameForger:
             train_idx, test_idx,
         ) = _walk_forward_split(data, X_outcome, y_outcome, X_goals, y_goals, test_fraction)
 
+        self.train_matches = completed.loc[train_idx].copy()
+
         context_cols = ["HomeTeam", "AwayTeam", "Date", "odds_error", "FTR"]
-        for col in ("B365H", "B365D", "B365A", "Div"):
+        for col in (
+            "B365H", "B365D", "B365A",
+            "B365CH", "B365CD", "B365CA",
+            "Div",
+        ):
             if col in data.columns:
                 context_cols.append(col)
         test_context = data.loc[test_idx, context_cols].copy()
@@ -292,6 +312,8 @@ class GameForger:
             "chaos_cache_only": chaos_cache_only,
             "bookie_blend_weight": self.bookie_blend_weight,
             "per_league_blend": self.per_league_blend,
+            "per_league_edge_margin": self.per_league_edge_margin,
+            "dixon_coles_blend_weight": self.dc_blend_weight,
             "edge_margin_min": self.edge_margin,
             "calibrated": self.calibrator.is_fitted,
             "outcome_features": self.outcome_features,
@@ -335,7 +357,11 @@ class GameForger:
         )
         outcome_cols, goals_cols = self._model_feature_columns(data)
         context_cols = ["HomeTeam", "AwayTeam", "Date"]
-        for col in ("B365H", "B365D", "B365A", "Div"):
+        for col in (
+            "B365H", "B365D", "B365A",
+            "B365CH", "B365CD", "B365CA",
+            "Div",
+        ):
             if col in data.columns:
                 context_cols.append(col)
         self.prediction_data = {
@@ -372,6 +398,13 @@ class GameForger:
         self.calibrator.fit(self.outcome_model, X_cal, y_cal)
         self.goals_model.fit(X_train_g, y_train_g)
 
+        if self.train_matches is not None and not self.train_matches.empty:
+            divs = None
+            meta_filter = self.training_metadata.get("div_filter")
+            if isinstance(meta_filter, list):
+                divs = meta_filter
+            self.dc_baseline.fit(self.train_matches, div_codes=divs)
+
         raw_preds = self.outcome_model.predict(X_fit)
         raw_accuracy = (raw_preds == y_fit).mean() * 100
         cal_status = "on" if self.calibrator.is_fitted else "skipped"
@@ -381,22 +414,38 @@ class GameForger:
         outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
         return self.calibrator.predict_proba(self.outcome_model, outcome_df)
 
-    def _blend_with_bookie(
+    def _compose_final_probs(
         self,
         model_probs: np.ndarray,
+        home_team: str | None,
+        away_team: str | None,
         b365: tuple[float, float, float] | None,
         blend_weight: float | None = None,
         div: str | None = None,
-    ) -> np.ndarray:
-        if b365 is None:
-            return model_probs
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+        probs = model_probs.copy()
+        if (
+            home_team
+            and away_team
+            and self.dc_blend_weight > 0
+        ):
+            dc_probs = self.dc_baseline.predict_probs(home_team, away_team, div=div)
+            if dc_probs is not None:
+                w_dc = self.dc_blend_weight
+                probs = (1 - w_dc) * probs + w_dc * dc_probs
+                total = probs.sum()
+                if total > 0:
+                    probs = probs / total
+
         implied = implied_probs_array(b365)
-        if implied is None:
-            return model_probs
-        w = self._blend_weight_for_div(div, blend_weight)
-        blended = (1 - w) * model_probs + w * implied
-        total = blended.sum()
-        return blended / total if total > 0 else model_probs
+        if implied is not None:
+            w_book = self._blend_weight_for_div(div, blend_weight)
+            if w_book > 0:
+                probs = (1 - w_book) * probs + w_book * implied
+                total = probs.sum()
+                if total > 0:
+                    probs = probs / total
+        return probs, model_probs, implied
 
     def predict_outcome_probs(
         self,
@@ -404,33 +453,46 @@ class GameForger:
         b365: tuple[float, float, float] | None = None,
         blend_weight: float | None = None,
         div: str | None = None,
+        home_team: str | None = None,
+        away_team: str | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
         """Return (final_probs, model_probs, implied_probs)."""
         model_probs = self._raw_model_probs(outcome_features)
-        implied = implied_probs_array(b365)
-        final = self._blend_with_bookie(
-            model_probs, b365, blend_weight=blend_weight, div=div,
+        return self._compose_final_probs(
+            model_probs,
+            home_team,
+            away_team,
+            b365,
+            blend_weight=blend_weight,
+            div=div,
         )
-        return final, model_probs, implied
 
     def _evaluate_row(
         self,
         outcome_features,
         b365: tuple[float, float, float] | None,
         blend_weight: float | None,
-        edge_margin: float,
+        edge_margin: float | None,
         require_edge: bool,
         div: str | None = None,
+        home_team: str | None = None,
+        away_team: str | None = None,
     ) -> tuple[int, float, float, np.ndarray] | None:
+        margin = self._edge_margin_for_div(div, edge_margin)
         final, _, implied = self.predict_outcome_probs(
-            outcome_features, b365=b365, blend_weight=blend_weight, div=div,
+            outcome_features,
+            b365=b365,
+            blend_weight=blend_weight,
+            div=div,
+            home_team=home_team,
+            away_team=away_team,
         )
         if implied is None:
             pred = int(np.argmax(final))
             edge = 0.0
         else:
             pred, edge = best_outcome_and_edge(final, implied)
-        if require_edge and implied is not None and not passes_edge_filter(edge, edge_margin):
+        if require_edge and implied is not None and not passes_edge_filter(edge, margin):
             return None
         confidence = float(np.max(final) * 100)
         return pred, confidence, edge, final
@@ -451,11 +513,13 @@ class GameForger:
             row = self.context.iloc[i]
             evaluated = self._evaluate_row(
                 X_test_o.iloc[i],
-                _b365_from_row(row),
+                b365_from_row(row),
                 blend_weight,
                 margin,
                 require_edge,
                 div=row.get("Div"),
+                home_team=row["HomeTeam"],
+                away_team=row["AwayTeam"],
             )
             if evaluated is None:
                 continue
@@ -471,21 +535,51 @@ class GameForger:
         model_acc = self.holdout_blend_accuracy(blend_weight=0.0)
         blend_acc = self.holdout_blend_accuracy()
         selective_acc = self.holdout_blend_accuracy(require_edge=True)
-        n_selective = len(self.backtest_on_holdout(edge_margin=self.edge_margin))
+        n_selective = len(self.backtest_on_holdout(require_edge=True))
         n_all = len(self.test_data[1])
+
+        _, y_test_o, _, _ = self.test_data
+        dc_acc, dc_n = self.dc_baseline.holdout_accuracy(self.context, y_test_o)
 
         print(f"Holdout — residual model only (w=0): {model_acc:.1f}%")
         print(
-            f"Holdout — blend w={self.bookie_blend_weight:.2f} (all picks): {blend_acc:.1f}%"
+            f"Holdout — blend w={self.bookie_blend_weight:.2f} "
+            f"+ DC w={self.dc_blend_weight:.2f} (all picks): {blend_acc:.1f}%"
         )
+        if dc_n:
+            print(f"Holdout — Dixon-Coles baseline only: {dc_acc:.1f}% on {dc_n} matches")
         print(
-            f"Holdout — selective edge ≥{self.edge_margin:.0%}: "
+            f"Holdout — selective edge (per-league margins): "
             f"{selective_acc:.1f}% on {n_selective}/{n_all} matches"
         )
         all_preds = self.backtest_on_holdout(require_edge=False, edge_margin=0.0)
         sel_preds = self.backtest_on_holdout(require_edge=True)
-        print_metrics_summary(summarize_predictions(all_preds, "Value metrics (all picks)"))
-        print_metrics_summary(summarize_predictions(sel_preds, "Value metrics (selective)"))
+        print_metrics_summary(summarize_predictions(all_preds, "Value metrics (all picks, closing)"))
+        print_metrics_summary(
+            summarize_predictions(sel_preds, "Value metrics (selective, closing)"),
+        )
+        sel_open = [
+            {**p, "b365": p.get("b365_open") or p.get("b365")}
+            for p in sel_preds
+            if p.get("b365_open") or p.get("b365")
+        ]
+        if sel_open:
+            print_metrics_summary(
+                summarize_predictions(sel_open, "Value metrics (selective, opening)"),
+            )
+        if sel_preds:
+            kelly_close = kelly_simulation(
+                sel_preds,
+                kelly_fraction=self.kelly_fraction,
+                odds_line="close",
+            )
+            print(
+                f"Kelly sim ({self.kelly_fraction:.0%} frac, closing): "
+                f"ROI {kelly_close['roi_pct']:+.1f}%, "
+                f"bankroll {kelly_close['final_bankroll']:.1f}, "
+                f"max DD {kelly_close['max_drawdown_pct']:.1f}% "
+                f"({kelly_close['bets']} bets)"
+            )
         return blend_acc
 
     def simulate_match(
@@ -494,10 +588,18 @@ class GameForger:
         goals_features,
         b365: tuple[float, float, float] | None = None,
         blend_weight: float | None = None,
+        home_team: str | None = None,
+        away_team: str | None = None,
+        div: str | None = None,
     ):
         goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
         final, _, _ = self.predict_outcome_probs(
-            outcome_features, b365=b365, blend_weight=blend_weight,
+            outcome_features,
+            b365=b365,
+            blend_weight=blend_weight,
+            home_team=home_team,
+            away_team=away_team,
+            div=div,
         )
         outcomes = np.random.choice([0, 1, 2], size=self.sim_runs, p=final)
         goals_pred = self.goals_model.predict(goals_df)[0]
@@ -512,7 +614,6 @@ class GameForger:
     ) -> list[dict]:
         if self.prediction_data is None:
             raise ValueError("Run prepare_prediction_data() with future matches first")
-        margin = self.edge_margin if edge_margin is None else edge_margin
         results = []
         X_outcome = self.prediction_data["X_outcome"]
         X_goals = self.prediction_data["X_goals"]
@@ -520,13 +621,19 @@ class GameForger:
 
         for i in range(len(X_outcome)):
             row = context.iloc[i]
-            b365 = _b365_from_row(row)
+            b365 = b365_from_row(row)
             goals_df = pd.DataFrame([X_goals.iloc[i]], columns=self.goals_features)
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
 
             evaluated = self._evaluate_row(
-                X_outcome.iloc[i], b365, None, margin, require_edge=True,
+                X_outcome.iloc[i],
+                b365,
+                None,
+                edge_margin,
+                require_edge=True,
                 div=row.get("Div"),
+                home_team=row["HomeTeam"],
+                away_team=row["AwayTeam"],
             )
             if evaluated is None:
                 continue
@@ -537,7 +644,12 @@ class GameForger:
 
             if use_simulation:
                 outcomes, goals, final = self.simulate_match(
-                    X_outcome.iloc[i], X_goals.iloc[i], b365=b365,
+                    X_outcome.iloc[i],
+                    X_goals.iloc[i],
+                    b365=b365,
+                    home_team=row["HomeTeam"],
+                    away_team=row["AwayTeam"],
+                    div=row.get("Div"),
                 )
                 pred = int(np.bincount(outcomes).argmax())
                 confidence = float(np.mean(outcomes == pred) * 100)
@@ -562,9 +674,14 @@ class GameForger:
                 "probs": {"H": float(final[1]), "D": float(final[0]), "A": float(final[2])},
                 "bookie_pick": bookie_pick,
             })
+        margin_label = (
+            f"{edge_margin:.0%}"
+            if edge_margin is not None
+            else "per-league"
+        )
         print(
             f"Edge-filtered picks: {len(results)} "
-            f"(margin ≥{margin:.0%}, confidence ≥{confidence_threshold}%)"
+            f"(margin ≥{margin_label}, confidence ≥{confidence_threshold}%)"
         )
         return results
 
@@ -573,18 +690,28 @@ class GameForger:
         confidence_threshold: float = 0.0,
         edge_margin: float | None = None,
         require_edge: bool = True,
+        div_filter: str | None = None,
     ) -> list[dict]:
         if self.test_data is None or self.context is None:
             raise ValueError("Run train() first")
-        margin = self.edge_margin if edge_margin is None else edge_margin
         X_test_o, y_test_o, X_test_g, _ = self.test_data
         results = []
         for i in range(len(X_test_o)):
             row = self.context.iloc[i]
-            b365 = _b365_from_row(row)
+            if div_filter and row.get("Div") != div_filter:
+                continue
+            b365 = b365_from_row(row)
+            b365_open = opening_b365_from_row(row)
+            b365_close = closing_b365_from_row(row)
             evaluated = self._evaluate_row(
-                X_test_o.iloc[i], b365, None, margin, require_edge,
+                X_test_o.iloc[i],
+                b365,
+                None,
+                edge_margin,
+                require_edge,
                 div=row.get("Div"),
+                home_team=row["HomeTeam"],
+                away_team=row["AwayTeam"],
             )
             if evaluated is None:
                 continue
@@ -595,6 +722,7 @@ class GameForger:
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
             actual = OUTCOME_MAP.get(row["FTR"], -1)
             bookie_code = bookie_favorite(*b365) if b365 else None
+            movement = line_movement(row)
             results.append({
                 "home": row["HomeTeam"],
                 "away": row["AwayTeam"],
@@ -610,6 +738,9 @@ class GameForger:
                 "odds_error": bool(row.get("odds_error", False)),
                 "probs": {"H": float(final[1]), "D": float(final[0]), "A": float(final[2])},
                 "b365": b365,
+                "b365_open": b365_open,
+                "b365_close": b365_close,
+                "line_movement": movement,
                 "bookie_code": bookie_code,
                 "bookie_pick": OUTCOME_LABELS[bookie_code] if bookie_code is not None else None,
             })

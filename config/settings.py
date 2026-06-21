@@ -178,6 +178,63 @@ def set_edge_margin_min(margin: float) -> None:
     config_path.write_text(text, encoding="utf-8")
 
 
+def dixon_coles_blend_weight() -> float:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    if model_cfg.get("dixon_coles_blend_weight") is not None:
+        return float(model_cfg["dixon_coles_blend_weight"])
+    return float(get_env("DIXON_COLES_BLEND_WEIGHT", "0.05"))
+
+
+def kelly_fraction() -> float:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    if model_cfg.get("kelly_fraction") is not None:
+        return float(model_cfg["kelly_fraction"])
+    return float(get_env("KELLY_FRACTION", "0.25"))
+
+
+def per_league_edge_margins() -> dict[str, float]:
+    cfg = load_leagues_config()
+    model_cfg = cfg.get("model") or {}
+    raw = model_cfg.get("per_league_edge_margin") or {}
+    return {str(k): float(v) for k, v in raw.items()}
+
+
+def edge_margin_for_div(div: str | None) -> float:
+    margins = per_league_edge_margins()
+    if div and div in margins:
+        return margins[div]
+    return edge_margin_min()
+
+
+def set_per_league_edge_margins(margins: dict[str, float]) -> None:
+    import re
+
+    config_path = ROOT / "config" / "leagues.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    lines = ["  per_league_edge_margin:"]
+    for code, m in sorted(margins.items()):
+        lines.append(f"    {code}: {round(float(m), 3)}")
+    block = "\n".join(lines) + "\n"
+
+    if re.search(r"^\s*per_league_edge_margin:\s*$", text, re.MULTILINE):
+        text = re.sub(
+            r"^\s*per_league_edge_margin:\s*\n(?:\s+\w+:\s*[\d.]+\n)*",
+            block,
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        text = text.replace(
+            "  edge_margin_min:",
+            f"{block}  edge_margin_min:",
+            1,
+        )
+    config_path.write_text(text, encoding="utf-8")
+
+
 def per_league_blend_weights() -> dict[str, float]:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}

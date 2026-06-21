@@ -35,7 +35,7 @@ def tune_leagues(
     tuned: dict[str, float] = {}
     current = per_league_blend_weights()
 
-    from predictors.game_forger import _b365_from_row
+    from evaluation.odds_lines import b365_from_row
 
     for div in div_codes:
         positions = [
@@ -52,7 +52,7 @@ def tune_leagues(
                 row = forger.context.iloc[i]
                 evaluated = forger._evaluate_row(
                     X_test_o.iloc[i],
-                    _b365_from_row(row),
+                    b365_from_row(row),
                     w,
                     0.0,
                     require_edge=False,

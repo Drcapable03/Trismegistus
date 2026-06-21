@@ -73,7 +73,7 @@ def run_backtest(limit: int = 200, use_cache: bool = True, refresh_cache: bool =
         confidence_threshold=0.0, require_edge=False, edge_margin=0.0,
     )
     selective_preds = forger.backtest_on_holdout(
-        confidence_threshold=0.0, require_edge=True, edge_margin=margin,
+        confidence_threshold=0.0, require_edge=True, edge_margin=None,
     )
     matches = read_matches()
     matches = _apply_div_filter(matches, div_codes)
@@ -198,6 +198,14 @@ def main():
         "--tune-edge", action="store_true",
         help="Grid-search edge margin on selective holdout ROI",
     )
+    parser.add_argument(
+        "--tune-edge-leagues", action="store_true",
+        help="Tune per-league edge margins on selective holdout ROI",
+    )
+    parser.add_argument(
+        "--kelly-sim", action="store_true",
+        help="Run fractional Kelly bankroll sim on selective holdout picks",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -205,7 +213,8 @@ def main():
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
-        args.fetch_xg, args.fetch_elo, args.tune_edge,
+        args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
+        args.kelly_sim,
     ])
 
     print("Trismegistus is alive!")
@@ -264,6 +273,27 @@ def main():
     if args.tune_edge:
         from scripts.tune_edge import tune_edge
         tune_edge(limit=args.limit, use_cache=use_cache)
+    if args.tune_edge_leagues:
+        from scripts.tune_edge_leagues import tune_edge_leagues
+        tune_edge_leagues(limit=args.limit, use_cache=use_cache)
+    if args.kelly_sim:
+        from evaluation.kelly import kelly_simulation
+        from config.settings import kelly_fraction
+
+        div_codes = league_div_codes()
+        forger = GameForger()
+        forger.train(limit=args.limit, use_cache=use_cache, div_filter=div_codes, chaos_cache_only=True)
+        preds = forger.backtest_on_holdout(require_edge=True)
+        if not preds:
+            print("Kelly sim: no selective picks on holdout.")
+        else:
+            for line in ("close", "open"):
+                sim = kelly_simulation(preds, kelly_fraction=kelly_fraction(), odds_line=line)
+                print(
+                    f"Kelly ({kelly_fraction():.0%}, {line}): "
+                    f"ROI {sim['roi_pct']:+.1f}%, bankroll {sim['final_bankroll']:.1f}, "
+                    f"max DD {sim['max_drawdown_pct']:.1f}% ({sim['bets']} bets)"
+                )
     print("Done.")
 
 

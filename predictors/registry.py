@@ -21,6 +21,8 @@ def save_game_forger(forger, tag: str = "game_forger") -> Path:
         "sim_runs": forger.sim_runs,
         "bookie_blend_weight": forger.bookie_blend_weight,
         "per_league_blend": getattr(forger, "per_league_blend", {}),
+        "per_league_edge_margin": getattr(forger, "per_league_edge_margin", {}),
+        "dixon_coles_blend_weight": getattr(forger, "dc_blend_weight", 0.0),
         "edge_margin": forger.edge_margin,
         "calibrator": getattr(forger, "calibrator", None),
         "training_metadata": getattr(forger, "training_metadata", {}),
@@ -46,6 +48,10 @@ def load_game_forger(forger, path: str | Path) -> None:
         forger.bookie_blend_weight = float(payload["bookie_blend_weight"])
     if "per_league_blend" in payload:
         forger.per_league_blend = dict(payload["per_league_blend"])
+    if "per_league_edge_margin" in payload:
+        forger.per_league_edge_margin = dict(payload["per_league_edge_margin"])
+    if "dixon_coles_blend_weight" in payload:
+        forger.dc_blend_weight = float(payload["dixon_coles_blend_weight"])
     if "edge_margin" in payload:
         forger.edge_margin = float(payload["edge_margin"])
     if "calibrator" in payload and payload["calibrator"] is not None:
