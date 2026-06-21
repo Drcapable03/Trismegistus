@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 import pandas as pd
 from sqlalchemy import inspect, text
 
+from config.settings import pit_cache_sentiment
 from utils.db import engine
 
 CACHE_TABLE = "chaos_cache"
@@ -37,7 +38,42 @@ def _match_key(home: str, away: str, date: str) -> tuple[str, str, str]:
     return home, away, str(date)
 
 
-def get_cached(home: str, away: str, date: str) -> dict | None:
+def _parse_fetched_at(value) -> datetime | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _strip_sentiment(record: dict) -> dict:
+    out = dict(record)
+    out["home_x_sentiment"] = 0.0
+    out["away_x_sentiment"] = 0.0
+    return out
+
+
+def sentiment_is_pit_safe(record: dict, match_dt: datetime) -> bool:
+    """True if cached sentiment could have existed before kickoff."""
+    if not pit_cache_sentiment():
+        return False
+    fetched = _parse_fetched_at(record.get("fetched_at"))
+    if fetched is None:
+        return False
+    kickoff = match_dt.replace(hour=23, minute=59, second=59)
+    if fetched.tzinfo is not None:
+        kickoff = kickoff.replace(tzinfo=UTC)
+    return fetched <= kickoff
+
+
+def get_cached(
+    home: str,
+    away: str,
+    date: str,
+    match_dt: datetime | None = None,
+    allow_sentiment: bool = True,
+) -> dict | None:
     ensure_chaos_cache()
     row = pd.read_sql(
         f"SELECT * FROM {CACHE_TABLE} WHERE HomeTeam = :h AND AwayTeam = :a AND Date = :d",
@@ -46,7 +82,12 @@ def get_cached(home: str, away: str, date: str) -> dict | None:
     )
     if row.empty:
         return None
-    return row.iloc[0].to_dict()
+    record = row.iloc[0].to_dict()
+    if not allow_sentiment:
+        return _strip_sentiment(record)
+    if match_dt is not None and not sentiment_is_pit_safe(record, match_dt):
+        return _strip_sentiment(record)
+    return record
 
 
 def save_cached(record: dict) -> None:

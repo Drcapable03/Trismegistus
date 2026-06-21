@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime as dt
 from pathlib import Path
 
 import pandas as pd
@@ -9,7 +9,7 @@ import yaml
 from agents.injuries_agent import fetch_injuries
 from agents.odds_agent import fetch_odds
 from agents.news_agent import fetch_news
-from config.settings import today
+from config.settings import today, use_sentiment_in_train
 from utils.chaos_cache import cache_stats, get_cached, save_cached
 
 TEAM_CITIES_PATH = Path(__file__).resolve().parent.parent / "config" / "team_cities.yaml"
@@ -37,13 +37,13 @@ def _city_for_team(team: str, lookup: dict[str, str]) -> str:
     return team.split()[-1]
 
 
-def _normalize_date(date) -> tuple[datetime, str, str]:
+def _normalize_date(date) -> tuple[dt, str, str]:
     current_date = today()
     try:
-        if isinstance(date, datetime):
+        if isinstance(date, dt):
             date_obj = date
         else:
-            date_obj = datetime.strptime(str(date), "%d/%m/%Y")
+            date_obj = dt.strptime(str(date), "%d/%m/%Y")
         return date_obj, date_obj.strftime("%Y-%m-%d"), date_obj.strftime("%d/%m/%Y")
     except ValueError:
         return current_date, current_date.strftime("%Y-%m-%d"), current_date.strftime("%d/%m/%Y")
@@ -95,6 +95,14 @@ def _default_record(home_team: str, away_team: str, date_display: str, row: pd.S
     }
 
 
+def _apply_sentiment_policy(record: dict, match_dt: dt, training: bool) -> dict:
+    out = dict(record)
+    if training and not use_sentiment_in_train():
+        out["home_x_sentiment"] = 0.0
+        out["away_x_sentiment"] = 0.0
+    return out
+
+
 def get_chaos_data(
     matches,
     injuries_df=None,
@@ -115,22 +123,33 @@ def get_chaos_data(
 
     for n, (_, row) in enumerate(matches.iterrows(), start=1):
         home_team, away_team, date = row["HomeTeam"], row["AwayTeam"], row["Date"]
-        _, date_str, date_display = _normalize_date(date)
+        date_obj, date_str, date_display = _normalize_date(date)
+        allow_sentiment = not (cache_only and not use_sentiment_in_train())
 
         if use_cache and not refresh:
-            cached = get_cached(home_team, away_team, date_display)
+            cached = get_cached(
+                home_team, away_team, date_display,
+                match_dt=date_obj, allow_sentiment=allow_sentiment,
+            )
             if cached:
                 cache_hits += 1
-                chaos_data.append({k: cached[k] for k in [
+                record = {k: cached[k] for k in [
                     "HomeTeam", "AwayTeam", "Date", "rain", "wind",
                     "home_x_sentiment", "away_x_sentiment", "home_injuries", "away_injuries",
                     "odds_H", "odds_A", "odds_D",
-                ]})
+                ]}
+                chaos_data.append(_apply_sentiment_policy(record, date_obj, training=cache_only))
                 continue
 
         if cache_only:
             cache_misses += 1
-            chaos_data.append(_default_record(home_team, away_team, date_display, row))
+            chaos_data.append(
+                _apply_sentiment_policy(
+                    _default_record(home_team, away_team, date_display, row),
+                    date_obj,
+                    training=True,
+                )
+            )
             continue
 
         print(f"Fetching chaos for {home_team} vs. {away_team} on {date_display} ({n}/{total})")

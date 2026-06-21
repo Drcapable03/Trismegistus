@@ -26,6 +26,11 @@ model:
     SP1: 0.55
   edge_margin_min: 0.05
 
+# Phase 4: chaos/sentiment policy (news is live-only; disabled in train by default)
+chaos:
+  use_sentiment_in_train: false
+  pit_cache_sentiment: true
+
 leagues:
   # --- Active (Big 5) ---
   Premier League:

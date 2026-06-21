@@ -68,6 +68,25 @@ def league_div_codes() -> list[str]:
     return [info["code"] for info in enabled_leagues().values()]
 
 
+def chaos_config() -> dict:
+    cfg = load_leagues_config()
+    return cfg.get("chaos") or {}
+
+
+def use_sentiment_in_train() -> bool:
+    chaos = chaos_config()
+    if "use_sentiment_in_train" in chaos:
+        return bool(chaos["use_sentiment_in_train"])
+    return get_env("USE_SENTIMENT_IN_TRAIN", "false").lower() in {"1", "true", "yes"}
+
+
+def pit_cache_sentiment() -> bool:
+    chaos = chaos_config()
+    if "pit_cache_sentiment" in chaos:
+        return bool(chaos["pit_cache_sentiment"])
+    return get_env("PIT_CACHE_SENTIMENT", "true").lower() in {"1", "true", "yes"}
+
+
 def edge_margin_min() -> float:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}

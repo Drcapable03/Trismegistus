@@ -184,13 +184,21 @@ def main():
         "--tune-leagues", action="store_true",
         help="Tune per-league bookie blend weights on holdout subsets",
     )
+    parser.add_argument(
+        "--archive-chaos", action="store_true",
+        help="Pre-cache historical weather into chaos_cache (PIT-safe, no news)",
+    )
+    parser.add_argument(
+        "--build-cities", action="store_true",
+        help="Regenerate config/team_cities.yaml for Big 5 teams",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
     run_all = not any([
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
-        args.tune_blend, args.tune_leagues,
+        args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
     ])
 
     print("Trismegistus is alive!")
@@ -234,6 +242,12 @@ def main():
     if args.tune_leagues:
         from scripts.tune_leagues import tune_leagues
         tune_leagues(limit=args.limit, use_cache=use_cache)
+    if args.archive_chaos:
+        from scripts.archive_chaos import archive_chaos
+        archive_chaos(div_filter=league_div_codes(), limit=args.limit)
+    if args.build_cities:
+        from scripts.build_team_cities import write_team_cities
+        write_team_cities()
     print("Done.")
 
 

@@ -20,6 +20,12 @@ SHOT_DEFAULTS = {
     "avg_shots_away": 11.0,
 }
 SHOT_COLS = ("HS", "AS", "HST", "AST")
+XG_ON_TARGET_WEIGHT = 0.35
+XG_OFF_TARGET_WEIGHT = 0.08
+XG_DEFAULTS = {
+    "avg_xg_for": 1.35,
+    "avg_xg_against": 1.25,
+}
 
 
 def _parse_dt(series: pd.Series) -> pd.Series:
@@ -49,6 +55,37 @@ def _team_form_prior(history: pd.DataFrame, team: str, before: pd.Timestamp) -> 
             pd.concat([conceded_home, conceded_away], ignore_index=True),
             FORM_DEFAULTS["avg_goals_conceded_home"],
         ),
+    }
+
+
+def _match_xg_proxy(hst: float, ast: float, hs: float, as_: float) -> tuple[float, float]:
+    home_xg = XG_ON_TARGET_WEIGHT * hst + XG_OFF_TARGET_WEIGHT * max(0.0, hs - hst)
+    away_xg = XG_ON_TARGET_WEIGHT * ast + XG_OFF_TARGET_WEIGHT * max(0.0, as_ - ast)
+    return home_xg, away_xg
+
+
+def _team_xg_prior(history: pd.DataFrame, team: str, before: pd.Timestamp) -> dict[str, float]:
+    prior = history[history["_dt"] < before]
+    xg_for, xg_against = [], []
+    home = prior[prior["HomeTeam"] == team]
+    away = prior[prior["AwayTeam"] == team]
+    if not home.empty and all(c in home.columns for c in SHOT_COLS):
+        for _, r in home.iterrows():
+            hxg, axg = _match_xg_proxy(r["HST"], r["AST"], r["HS"], r["AS"])
+            xg_for.append(hxg)
+            xg_against.append(axg)
+    if not away.empty and all(c in away.columns for c in SHOT_COLS):
+        for _, r in away.iterrows():
+            hxg, axg = _match_xg_proxy(r["HST"], r["AST"], r["HS"], r["AS"])
+            xg_for.append(axg)
+            xg_against.append(hxg)
+
+    def _mean(vals: list[float], default: float) -> float:
+        return float(sum(vals) / len(vals)) if vals else default
+
+    return {
+        "avg_xg_for": _mean(xg_for, XG_DEFAULTS["avg_xg_for"]),
+        "avg_xg_against": _mean(xg_against, XG_DEFAULTS["avg_xg_against"]),
     }
 
 
@@ -96,6 +133,8 @@ def compute_pit_form_and_h2h(
     form_away_scored, form_away_conceded = [], []
     shots_home, shots_away = [], []
     shots_total_home, shots_total_away = [], []
+    xg_for_home, xg_against_home = [], []
+    xg_for_away, xg_against_away = [], []
     h2h_win, h2h_hg, h2h_ag = [], [], []
     has_shots = all(c in hist.columns for c in SHOT_COLS)
 
@@ -113,10 +152,16 @@ def compute_pit_form_and_h2h(
         if has_shots:
             hs = _team_shot_prior(hist, home, dt)
             aws = _team_shot_prior(hist, away, dt)
+            hxg = _team_xg_prior(hist, home, dt)
+            axg = _team_xg_prior(hist, away, dt)
             shots_home.append(hs["avg_shots_on_target"])
             shots_away.append(aws["avg_shots_on_target"])
             shots_total_home.append(hs["avg_shots"])
             shots_total_away.append(aws["avg_shots"])
+            xg_for_home.append(hxg["avg_xg_for"])
+            xg_against_home.append(hxg["avg_xg_against"])
+            xg_for_away.append(axg["avg_xg_for"])
+            xg_against_away.append(axg["avg_xg_against"])
 
         prior_h2h = hist[
             (hist["HomeTeam"] == home)
@@ -144,4 +189,8 @@ def compute_pit_form_and_h2h(
         out["avg_shots_on_target_away"] = shots_away
         out["avg_shots_home"] = shots_total_home
         out["avg_shots_away"] = shots_total_away
+        out["avg_xg_for_home"] = xg_for_home
+        out["avg_xg_against_home"] = xg_against_home
+        out["avg_xg_for_away"] = xg_for_away
+        out["avg_xg_against_away"] = xg_against_away
     return out.drop(columns=["_dt"])

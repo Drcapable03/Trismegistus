@@ -21,9 +21,10 @@ def test_calculate_team_form():
         "Div": ["E0", "E0", "E0"],
     })
     df.to_sql("matches", engine, if_exists="append", index=False)
-    calculate_team_form()
+    calculate_team_form(div_filter="E0")
 
-    form = pd.read_sql("SELECT * FROM team_form", engine)
+    form = pd.read_sql('SELECT * FROM team_form WHERE "Div" = \'E0\'', engine)
     assert "team" in form.columns
+    assert "Div" in form.columns
     assert "avg_goals_scored" in form.columns
     assert len(form) >= 2

@@ -1,42 +1,121 @@
-# Home team -> city for weather geocoding (avoids fragile name splitting)
-Manchester United: Manchester
-Manchester City: Manchester
-Liverpool: Liverpool
+# Home team -> city for weather geocoding (football-data.co.uk names)
+# Regenerate Big 5 entries: poetry run python scripts/build_team_cities.py
+AC Milan: Milan
+Alaves: Vitoria-Gasteiz
+Angers: Angers
 Arsenal: London
-Chelsea: London
-Tottenham: London
-West Ham: London
-Crystal Palace: London
-Fulham: London
-Brentford: London
-Wolves: Wolverhampton
-Leicester: Leicester
-Everton: Liverpool
-Newcastle: Newcastle
 Aston Villa: Birmingham
-Brighton: Brighton
+Atalanta: Bergamo
+Ath Bilbao: Bilbao
+Ath Madrid: Madrid
+Atletico Madrid: Madrid
+Augsburg: Augsburg
+Auxerre: Auxerre
+Barcelona: Barcelona
+Bayern Munich: Munich
+Betis: Seville
+Bochum: Bochum
+Bologna: Bologna
 Bournemouth: Bournemouth
+Brentford: London
+Brest: Brest
+Brighton: Brighton
+Burnley: Burnley
+Cagliari: Cagliari
+Celta: Vigo
+Chelsea: London
+Como: Como
+Cremonese: Cremona
+Crystal Palace: London
+Dortmund: Dortmund
+Ein Frankfurt: Frankfurt
+Elche: Elche
+Empoli: Empoli
+Espanol: Barcelona
+Everton: Liverpool
+FC Koln: Cologne
+Fiorentina: Florence
+Freiburg: Freiburg
+Fulham: London
+Genoa: Genoa
+Getafe: Madrid
+Girona: Girona
+Hamburg: Hamburg
+Heidenheim: Heidenheim
+Hoffenheim: Sinsheim
+Holstein Kiel: Kiel
+Inter: Milan
+Ipswich: Ipswich
+Juventus: Turin
+Las Palmas: Las Palmas
+Lazio: Rome
+Le Havre: Le Havre
+Lecce: Lecce
+Leeds: Leeds
+Leganes: Leganes
+Leicester: Leicester
+Lens: Lens
+Levante: Valencia
+Leverkusen: Leverkusen
+Lille: Lille
+Liverpool: Liverpool
+Lorient: Lorient
+Luton: Luton
+Lyon: Lyon
+M'gladbach: Monchengladbach
+Mainz: Mainz
+Mallorca: Palma
+Man City: Manchester
+Man United: Manchester
+Manchester City: Manchester
+Manchester United: Manchester
+Marseille: Marseille
+Metz: Metz
+Milan: Milan
+Monaco: Monaco
+Montpellier: Montpellier
+Monza: Monza
+Nantes: Nantes
+Napoli: Naples
+Newcastle: Newcastle
+Nice: Nice
+Nott'm Forest: Nottingham
 Nottingham Forest: Nottingham
+Osasuna: Pamplona
+Oviedo: Oviedo
+PSG: Paris
+Paris FC: Paris
+Paris SG: Paris
+Parma: Parma
+Pisa: Pisa
+RB Leipzig: Leipzig
+Real Madrid: Madrid
+Reims: Reims
+Rennes: Rennes
+Roma: Rome
+Sassuolo: Sassuolo
+Sevilla: Seville
 Sheffield Utd: Sheffield
 Sheffield Weds: Sheffield
-Burnley: Burnley
-Luton: Luton
-Ipswich: Ipswich
+Sociedad: San Sebastian
 Southampton: Southampton
-Leeds: Leeds
-Real Madrid: Madrid
-Barcelona: Barcelona
-Atletico Madrid: Madrid
-Bayern Munich: Munich
-Dortmund: Dortmund
-Inter: Milan
-AC Milan: Milan
-Juventus: Turin
-Napoli: Naples
-Roma: Rome
-Lazio: Rome
-PSG: Paris
-Marseille: Marseille
-Lyon: Lyon
-Monaco: Monaco
-Lille: Lille
+St Etienne: Saint-Etienne
+St Pauli: Hamburg
+Strasbourg: Strasbourg
+Stuttgart: Stuttgart
+Sunderland: Sunderland
+Torino: Turin
+Tottenham: London
+Toulouse: Toulouse
+Udinese: Udine
+Union Berlin: Berlin
+Valencia: Valencia
+Valladolid: Valladolid
+Vallecano: Madrid
+Venezia: Venice
+Verona: Verona
+Villarreal: Villarreal
+Werder Bremen: Bremen
+West Ham: London
+Wolfsburg: Wolfsburg
+Wolves: Wolverhampton

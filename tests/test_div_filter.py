@@ -31,8 +31,10 @@ def test_calculate_team_form_div_filter():
     df.to_sql("matches", engine, if_exists="append", index=False)
     calculate_team_form(div_filter="WC26")
     form = pd.read_sql("SELECT * FROM team_form", engine)
-    assert "Arsenal" not in form["team"].values
-    assert "Spain" in form["team"].values
+    assert "Div" in form.columns
+    wc_form = form[form["Div"] == "WC26"]
+    assert "Arsenal" not in wc_form["team"].values
+    assert "Spain" in wc_form["team"].values
 
 
 def _fake_chaos(matches, **kwargs):

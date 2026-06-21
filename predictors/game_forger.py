@@ -28,6 +28,10 @@ SHOT_FEATURE_COLS = [
     "avg_shots_on_target_home", "avg_shots_on_target_away",
     "avg_shots_home", "avg_shots_away",
 ]
+XG_FEATURE_COLS = [
+    "avg_xg_for_home", "avg_xg_against_home",
+    "avg_xg_for_away", "avg_xg_against_away",
+]
 
 
 def _parse_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -196,7 +200,7 @@ class GameForger:
             "avg_goals_conceded_home", "avg_goals_conceded_away",
             *self._div_columns(data),
         ]
-        for col in SHOT_FEATURE_COLS:
+        for col in (*SHOT_FEATURE_COLS, *XG_FEATURE_COLS):
             if col in data.columns:
                 outcome_cols.append(col)
                 if col not in goals_cols:
