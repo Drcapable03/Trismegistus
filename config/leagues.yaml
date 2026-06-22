@@ -9,8 +9,12 @@ max_active_leagues: 10
 season: "2526"
 
 # Optional extra seasons for deeper history (free CSVs, same source)
+# Phase 6E: expanded to 4 prior seasons (~9k Big 5 completed matches)
 historical_seasons:
   - "2425"
+  - "2324"
+  - "2223"
+  - "2122"
 
 fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
 

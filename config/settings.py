@@ -46,17 +46,32 @@ def enabled_leagues() -> dict[str, dict]:
     return leagues
 
 
+def current_season() -> str:
+    return str(load_leagues_config()["season"])
+
+
+def historical_seasons() -> list[str]:
+    return [str(s) for s in load_leagues_config().get("historical_seasons", [])]
+
+
+def all_seasons() -> list[str]:
+    return [current_season(), *historical_seasons()]
+
+
+def football_data_league_url(season: str, div_code: str) -> str:
+    base = "https://www.football-data.co.uk/mmz4281/{season}"
+    return f"{base.format(season=season)}/{div_code}.csv"
+
+
 def league_urls() -> dict[str, str]:
     """Return download URLs for all enabled leagues across current + historical seasons."""
-    cfg = load_leagues_config()
-    seasons = [cfg["season"], *cfg.get("historical_seasons", [])]
-    base = "https://www.football-data.co.uk/mmz4281/{season}"
+    seasons = all_seasons()
     urls = {}
     for name, info in enabled_leagues().items():
         code = info["code"]
         for season in seasons:
             label = f"{name} ({season})" if len(seasons) > 1 else name
-            urls[label] = f"{base.format(season=season)}/{code}.csv"
+            urls[label] = football_data_league_url(season, code)
     return urls
 
 
@@ -358,7 +373,7 @@ def league_summary() -> str:
     inactive = [
         n for n, i in cfg.get("leagues", {}).items() if not i.get("enabled", True)
     ]
-    seasons = [cfg["season"], *cfg.get("historical_seasons", [])]
+    seasons = all_seasons()
     return (
         f"Active leagues ({len(active)}): {', '.join(active)}\n"
         f"Seasons: {', '.join(seasons)}\n"

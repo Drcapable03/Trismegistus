@@ -45,10 +45,17 @@ def reset_table(table_name: str) -> None:
     print(f"Reset table {table_name}.")
 
 
-def load_csv_to_db(csv_path: str, table_name: str, if_exists: str = "append") -> int:
+def load_csv_to_db(
+    csv_path: str,
+    table_name: str,
+    if_exists: str = "append",
+    season: str | None = None,
+) -> int:
     """Load CSV into SQL table, extending schema as needed and deduplicating rows."""
     ensure_schema(table_name)
     df = pd.read_csv(csv_path)
+    if season:
+        df["Season"] = season
     if df.empty:
         print(f"No rows in {csv_path}")
         return 0

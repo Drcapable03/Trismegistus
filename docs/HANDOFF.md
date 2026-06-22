@@ -201,6 +201,35 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 006 — 2026-06-22 (Phase 6E — Expand historical seasons)
+
+### Completed
+- Expanded `historical_seasons` in `config/leagues.yaml`: 2425, 2324, 2223, 2122 (+ current 2526)
+- Season helpers in `config/settings.py`: `current_season()`, `historical_seasons()`, `all_seasons()`, `football_data_league_url()`
+- `Season` column tagged on ingest (`utils/db.py`, `main.py`)
+- `scripts/expand_history.py` — URL preflight (25/25 CSVs) + per-season DB coverage report
+- CLI: `--expand-history`; `--explore` shows season breakdown
+- `tests/test_expand_history.py` (5 tests)
+
+### Verified run
+```
+poetry run python main.py --expand-history
+# 25/25 URLs ok
+poetry run python main.py --reset --ingest --limit 0
+# 8,908 Big 5 completed matches ingested (5 seasons)
+poetry run python main.py --backtest --limit 0
+# walk-forward 7127 train / 1781 test; holdout 52.6%
+poetry run pytest tests/ -q
+# 96 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Phase 6F: Secondary enrichment (FBref/StatsBomb) if ROI still flat
+2. Add Reddit creds to `.env` and re-run `--calibrate-intel`
+3. Populate chaos intel cache via `--predict --refresh-cache` when fixtures land
+
+---
+
 ## Template for next entry
 
 ```

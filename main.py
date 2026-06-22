@@ -4,6 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from config.settings import (
+    current_season,
     edge_margin_min,
     fixtures_url,
     league_div_codes,
@@ -12,6 +13,7 @@ from config.settings import (
     per_league_edge_margins,
     today,
 )
+from scripts.expand_history import season_coverage, season_from_league_label
 from predictors.blunder_sniffer import BlunderSniffer
 from predictors.game_forger import GameForger, _apply_div_filter, _is_completed, _parse_dates
 from predictors.registry import latest_model_path, load_game_forger, save_game_forger
@@ -39,10 +41,11 @@ def ingest_data(reset: bool = False) -> None:
     print(league_summary())
     for league, url in league_urls().items():
         csv_path = scrape_matches(url, league)
-        load_csv_to_db(csv_path, "matches")
+        season = season_from_league_label(league)
+        load_csv_to_db(csv_path, "matches", season=season)
 
     csv_path = scrape_matches(fixtures_url(), "Fixtures")
-    load_csv_to_db(csv_path, "matches")
+    load_csv_to_db(csv_path, "matches", season=current_season())
     calculate_team_form(div_filter=league_div_codes())
     print("Ingest complete.")
 
@@ -187,6 +190,14 @@ def explore_data() -> None:
     print(df.columns.tolist())
     completed = _is_completed(df).sum()
     print(f"Completed: {completed}, Total: {len(df)}")
+    coverage = season_coverage(df)
+    if not coverage.empty:
+        print("Season coverage (completed / total):")
+        for season in sorted(coverage["Season"].unique()):
+            rows = coverage[coverage["Season"] == season]
+            done = int(rows["completed"].sum())
+            total = int(rows["total"].sum())
+            print(f"  {season}: {done} / {total}")
     print(league_summary())
     print(f"Chaos cache: {cache_stats()}")
     from utils.odds_cache import cache_stats as odds_cache_stats
@@ -251,6 +262,10 @@ def main():
         help="Grid-search Dixon-Coles blend weight on selective holdout ROI",
     )
     parser.add_argument(
+        "--expand-history", action="store_true",
+        help="Verify historical season CSV URLs and report DB coverage",
+    )
+    parser.add_argument(
         "--kelly-sim", action="store_true",
         help="Run fractional Kelly bankroll sim on selective holdout picks",
     )
@@ -290,7 +305,7 @@ def main():
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
         args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
-        args.tune_dc_blend,
+        args.tune_dc_blend, args.expand_history,
         args.kelly_sim, args.validate_live, args.fetch_odds,
         args.calibrate_intel, args.intel_roi,
     ])
@@ -392,6 +407,9 @@ def main():
     if args.tune_dc_blend:
         from scripts.tune_dc_blend import tune_dc_blend
         tune_dc_blend(limit=args.limit, use_cache=use_cache)
+    if args.expand_history:
+        from scripts.expand_history import expand_history
+        expand_history()
     if args.kelly_sim:
         from evaluation.kelly import kelly_simulation
         from config.settings import kelly_fraction
