@@ -162,10 +162,14 @@ def get_chaos_data(
         city = _city_for_team(home_team, team_cities)
         rain, wind = _fetch_weather(city, date_str)
 
-        home_intel = fetch_team_intel(home_team, date_str, opponent=away_team)
-        away_intel = fetch_team_intel(away_team, date_str, opponent=home_team)
+        div_code = str(row.get("Div")) if row.get("Div") else None
+        home_intel = fetch_team_intel(
+            home_team, date_str, opponent=away_team, div_code=div_code,
+        )
+        away_intel = fetch_team_intel(
+            away_team, date_str, opponent=home_team, div_code=div_code,
+        )
 
-        div_code = row.get("Div") if hasattr(row, "get") else None
         odds = fetch_odds(
             home_team, away_team, date_str,
             force_refresh=refresh,

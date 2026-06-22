@@ -3,6 +3,7 @@
 import re
 from urllib.parse import parse_qs, urlparse
 
+from config.settings import youtube_channels_for_div
 from scrapers.browser import fetch_page
 from utils.intel_score import score_texts
 
@@ -26,7 +27,7 @@ def _extract_video_ids(page, limit: int) -> list[str]:
 def _google_youtube_video_ids(query: str, max_videos: int) -> list[str]:
     from urllib.parse import quote_plus
 
-    url = f"https://www.google.com/search?q={quote_plus(query + ' site:youtube.com')}&hl=en"
+    url = f"https://www.google.com/search?q={quote_plus(query)}&hl=en"
     try:
         page = fetch_page(url, force_stealth=True)
         return _extract_video_ids(page, max_videos)
@@ -71,6 +72,38 @@ def _video_ids_from_urls(urls: list[str]) -> list[str]:
     return ids
 
 
+def discover_youtube_video_ids(
+    team: str,
+    opponent: str | None = None,
+    *,
+    div_code: str | None = None,
+    video_urls: list[str] | None = None,
+    search_query_template: str | None = None,
+    max_videos: int = 3,
+) -> list[str]:
+    """Resolve video IDs: pinned URLs → league channels → generic search."""
+    video_ids = _video_ids_from_urls(video_urls or [])
+    if video_ids:
+        return video_ids[:max_videos]
+
+    channels = youtube_channels_for_div(div_code)
+    opp = opponent or ""
+    for channel in channels:
+        query = f"{team} {opp} {channel} site:youtube.com".strip()
+        for vid in _google_youtube_video_ids(query, 1):
+            if vid not in video_ids:
+                video_ids.append(vid)
+        if len(video_ids) >= max_videos:
+            return video_ids[:max_videos]
+
+    template = search_query_template or "{team} {opponent} match preview"
+    query = template.format(team=team, opponent=opp).strip()
+    for vid in _google_youtube_video_ids(f"{query} site:youtube.com", max_videos):
+        if vid not in video_ids:
+            video_ids.append(vid)
+    return video_ids[:max_videos]
+
+
 def scrape_youtube_sentiment(
     team: str,
     opponent: str | None = None,
@@ -78,13 +111,17 @@ def scrape_youtube_sentiment(
     search_query_template: str | None = None,
     comment_limit: int = 40,
     max_videos: int = 3,
+    div_code: str | None = None,
 ) -> float:
     """Return 0-1 morale from YouTube comments on match-related videos."""
-    video_ids = _video_ids_from_urls(video_urls or [])
-    if not video_ids:
-        template = search_query_template or "{team} {opponent} match preview"
-        query = template.format(team=team, opponent=opponent or "").strip()
-        video_ids = _google_youtube_video_ids(query, max_videos)
+    video_ids = discover_youtube_video_ids(
+        team,
+        opponent,
+        div_code=div_code,
+        video_urls=video_urls,
+        search_query_template=search_query_template,
+        max_videos=max_videos,
+    )
 
     if not video_ids:
         return 0.5

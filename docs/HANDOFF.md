@@ -147,6 +147,32 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 004 — 2026-06-22 (Phase 6C — Intel calibration)
+
+### Completed
+- Curated YouTube `channels_by_div` per Big 5 in `config/intel.yaml`
+- League-aware YouTube discovery (`discover_youtube_video_ids`, `div_code` in intel agent)
+- Reddit credential preflight (`verify_reddit_connection`, `--calibrate-intel`)
+- `scripts/calibrate_intel.py` — static source checks + optional live probes
+- `scripts/intel_roi.py` — chaos-cache coverage, sentiment summary, holdout ablation
+- CLI: `--calibrate-intel`, `--calibrate-intel-live`, `--intel-roi`
+- `GameForger.backtest_on_holdout(intel_override=...)` for ablation tests
+
+### Verified run
+```
+poetry run python main.py --calibrate-intel
+# 4/5 passed (Reddit creds optional)
+poetry run pytest tests/ -q
+# 88 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Phase 6D: Retune Dixon-Coles blend weight
+2. Add Reddit creds to `.env` and re-run `--calibrate-intel`
+3. Populate chaos intel cache via `--predict --refresh-cache` when fixtures land
+
+---
+
 ## Template for next entry
 
 ```

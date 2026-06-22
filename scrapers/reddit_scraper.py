@@ -5,6 +5,10 @@ import os
 from utils.intel_score import score_texts
 
 
+def reddit_credentials_configured() -> bool:
+    return bool(os.getenv("REDDIT_CLIENT_ID") and os.getenv("REDDIT_CLIENT_SECRET"))
+
+
 def _reddit_client():
     client_id = os.getenv("REDDIT_CLIENT_ID")
     client_secret = os.getenv("REDDIT_CLIENT_SECRET")
@@ -18,6 +22,20 @@ def _reddit_client():
         client_secret=client_secret,
         user_agent=user_agent,
     )
+
+
+def verify_reddit_connection() -> tuple[bool, str]:
+    """Check Reddit API credentials without a full team search."""
+    if not reddit_credentials_configured():
+        return False, "REDDIT_CLIENT_ID/SECRET not set in .env"
+    reddit = _reddit_client()
+    if reddit is None:
+        return False, "PRAW client failed to initialize"
+    try:
+        name = reddit.subreddit("soccer").display_name
+        return True, f"Reddit API OK (r/{name})"
+    except Exception as exc:
+        return False, f"Reddit API error: {exc}"
 
 
 def scrape_reddit_sentiment(

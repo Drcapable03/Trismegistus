@@ -266,6 +266,18 @@ def main():
         "--fetch-odds-league", type=str, default=None,
         help="Scrape one league only (E0, SP1, D1, I1, F1) with --fetch-odds",
     )
+    parser.add_argument(
+        "--calibrate-intel", action="store_true",
+        help="Run intel source pre-flight checks (news, Reddit, YouTube)",
+    )
+    parser.add_argument(
+        "--calibrate-intel-live", action="store_true",
+        help="With --calibrate-intel: fetch live probe intel (network)",
+    )
+    parser.add_argument(
+        "--intel-roi", action="store_true",
+        help="Report chaos-cache intel coverage and holdout ablation ROI",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -275,6 +287,7 @@ def main():
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
         args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
         args.kelly_sim, args.validate_live, args.fetch_odds,
+        args.calibrate_intel, args.intel_roi,
     ])
 
     print("Trismegistus is alive!")
@@ -341,6 +354,16 @@ def main():
     if args.fetch_elo:
         from scripts.fetch_elo import fetch_elo
         fetch_elo(div_filter=league_div_codes())
+    if args.calibrate_intel:
+        from scripts.calibrate_intel import run_calibrate_intel
+
+        exit_code = run_calibrate_intel(live_fetch=args.calibrate_intel_live)
+        if exit_code != 0:
+            raise SystemExit(exit_code)
+    if args.intel_roi:
+        from scripts.intel_roi import run_intel_roi
+
+        run_intel_roi(limit=args.limit if args.limit > 0 else 200, use_cache=use_cache)
     if args.fetch_odds:
         from scripts.fetch_odds import fetch_big5_odds, fetch_league_odds
         from utils.odds_cache import cache_stats

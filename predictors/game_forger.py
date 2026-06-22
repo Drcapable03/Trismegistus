@@ -13,8 +13,10 @@ from config.settings import per_league_edge_margins
 from evaluation.kelly import kelly_simulation
 from evaluation.odds_lines import (
     b365_from_row,
+    closing_b365_from_row,
     line_movement,
     opening_and_closing_from_row,
+    opening_b365_from_row,
     resolve_b365_for_live,
 )
 from utils.chaos_cache import INTEL_COLS
@@ -446,6 +448,24 @@ class GameForger:
             return features.to_frame().T.reindex(columns=columns, fill_value=0).fillna(0)
         return pd.DataFrame([features], columns=columns).fillna(0)
 
+    def _apply_intel_override(self, features, sentiment: float) -> pd.Series:
+        """Pin intel feature columns for holdout ablation tests."""
+        if isinstance(features, pd.Series):
+            out = features.copy()
+        else:
+            out = pd.Series(features, index=self.outcome_features)
+        for col in ("home_news_attention", "away_news_attention"):
+            if col in out.index:
+                out[col] = 0.0
+        for col in (
+            "home_news_sentiment", "away_news_sentiment",
+            "home_reddit_sentiment", "away_reddit_sentiment",
+            "home_youtube_sentiment", "away_youtube_sentiment",
+        ):
+            if col in out.index:
+                out[col] = sentiment
+        return out
+
     def _raw_model_probs(self, outcome_features) -> np.ndarray:
         outcome_df = self._feature_row_df(outcome_features, self.outcome_features)
         return self.calibrator.predict_proba(self.outcome_model, outcome_df)
@@ -743,6 +763,7 @@ class GameForger:
         edge_margin: float | None = None,
         require_edge: bool = True,
         div_filter: str | None = None,
+        intel_override: float | None = None,
     ) -> list[dict]:
         if self.test_data is None or self.context is None:
             raise ValueError("Run train() first")
@@ -754,9 +775,12 @@ class GameForger:
                 continue
             b365 = b365_from_row(row)
             b365_open = opening_b365_from_row(row)
-            b365_close = closing_b365_from_row(row)
+            b365_close = closing_b365_from_row(row)  # noqa: F821 — imported above
+            outcome_features = X_test_o.iloc[i]
+            if intel_override is not None:
+                outcome_features = self._apply_intel_override(outcome_features, intel_override)
             evaluated = self._evaluate_row(
-                X_test_o.iloc[i],
+                outcome_features,
                 b365,
                 None,
                 edge_margin,

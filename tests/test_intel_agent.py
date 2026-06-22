@@ -18,8 +18,15 @@ def test_fetch_team_intel_mocked(monkeypatch):
         lambda team, query_template=None: {"attention": 0.3, "sentiment": 0.7},
     )
     monkeypatch.setattr("agents.intel_agent.scrape_reddit_sentiment", lambda *a, **k: 0.6)
-    monkeypatch.setattr("agents.intel_agent.scrape_youtube_sentiment", lambda *a, **k: 0.4)
-    intel = fetch_team_intel("Arsenal", "2026-06-20", opponent="Chelsea")
+    captured = {}
+
+    def fake_youtube(*a, **k):
+        captured.update(k)
+        return 0.4
+
+    monkeypatch.setattr("agents.intel_agent.scrape_youtube_sentiment", fake_youtube)
+    intel = fetch_team_intel("Arsenal", "2026-06-20", opponent="Chelsea", div_code="E0")
+    assert captured.get("div_code") == "E0"
     assert intel["news_attention"] == 0.3
     assert intel["reddit_sentiment"] == 0.6
 

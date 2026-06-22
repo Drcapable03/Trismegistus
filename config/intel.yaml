@@ -1,4 +1,5 @@
-# Phase 5B: live intel sources (disabled in training by default — see leagues.yaml chaos)
+# Phase 5B/6C: live intel sources (disabled in training by default — see leagues.yaml chaos)
+# Reddit requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET in .env
 
 news:
   enabled: true
@@ -18,8 +19,38 @@ reddit:
 
 youtube:
   enabled: true
-  # Optional direct video URLs; otherwise Google discovers YouTube links via Scrapling
+  # Trusted channel names used to boost Google video discovery per league
+  channels_by_div:
+    E0:
+      - "Sky Sports Football"
+      - "Premier League"
+    SP1:
+      - "LaLiga"
+      - "ESPN FC"
+    D1:
+      - "Bundesliga"
+      - "Sky Sport Deutschland"
+    I1:
+      - "Serie A"
+      - "DAZN Football"
+    F1:
+      - "Ligue 1"
+      - "Foot Mercato"
+  # Optional pinned video URLs (override discovery when set)
   video_urls: []
   search_query_template: "{team} {opponent} match preview"
   comment_limit: 40
   max_videos: 3
+
+# Sample fixtures for --calibrate-intel live probes
+calibration:
+  sample_probes:
+    - team: Arsenal
+      opponent: Chelsea
+      div: E0
+    - team: Barcelona
+      opponent: Real Madrid
+      div: SP1
+    - team: Bayern Munich
+      opponent: Dortmund
+      div: D1

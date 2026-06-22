@@ -121,6 +121,20 @@ def intel_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
+def intel_calibration_probes() -> list[dict]:
+    cfg = intel_config().get("calibration") or {}
+    probes = cfg.get("sample_probes") or []
+    return [p for p in probes if p.get("team")]
+
+
+def youtube_channels_for_div(div_code: str | None) -> list[str]:
+    if not div_code:
+        return []
+    youtube = intel_config().get("youtube") or {}
+    channels = youtube.get("channels_by_div") or {}
+    return list(channels.get(div_code, []))
+
+
 def devig_method() -> str:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}

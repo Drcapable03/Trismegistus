@@ -14,7 +14,12 @@ def _scrapling_enabled() -> bool:
     return os.getenv("TRIS_USE_SCRAPLING", "true").lower() in {"1", "true", "yes"}
 
 
-def fetch_team_intel(team: str, date: str, opponent: str | None = None) -> dict[str, float]:
+def fetch_team_intel(
+    team: str,
+    date: str,
+    opponent: str | None = None,
+    div_code: str | None = None,
+) -> dict[str, float]:
     """Buzz + morale features for one team. date reserved for future time filtering."""
     _ = date
     cfg = intel_config()
@@ -55,6 +60,7 @@ def fetch_team_intel(team: str, date: str, opponent: str | None = None) -> dict[
             search_query_template=youtube_cfg.get("search_query_template"),
             comment_limit=int(youtube_cfg.get("comment_limit", 40)),
             max_videos=int(youtube_cfg.get("max_videos", 3)),
+            div_code=div_code,
         )
 
     return out
