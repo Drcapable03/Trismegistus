@@ -121,6 +121,32 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 003 — 2026-06-22 (Phase 6B — Big 5 live odds)
+
+### Completed
+- OddsPortal Scrapling scrape for Big 5 (`config/leagues.yaml` oddsportal URLs)
+- `scrape_big5_odds()` / `scrape_league_odds()` in `scrapers/oddsportal.py`
+- Div-scoped SQLite cache (`utils/odds_cache.save_scrape(div_filter=...)`)
+- Team alias matching for OddsPortal names (`config/team_aliases.yaml` oddsportal section)
+- `agents/odds_agent.fetch_odds()` chain: DB → cached scrape → Odds API
+- CLI: `--fetch-odds`, `--fetch-odds-league E0`
+- `TRIS_AUTO_SCRAPE_ODDS` env (default false — run `--fetch-odds` before predict)
+
+### Verified run
+```
+poetry run python main.py --fetch-odds --fetch-odds-league E0
+# Scraped 10 EPL matches, cached (TTL 6h)
+poetry run pytest tests/ -q
+# 80 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Phase 6C: Intel calibration (Reddit creds, YouTube channels)
+2. `--fetch-odds` for all Big 5 before match weeks
+3. Re-run `--predict` when football-data fixtures land
+
+---
+
 ## Template for next entry
 
 ```

@@ -1,4 +1,4 @@
-"""Scrape World Cup odds and fixtures from OddsPortal via Scrapling."""
+"""Scrape league odds and fixtures from OddsPortal via Scrapling."""
 
 import re
 from datetime import datetime
@@ -7,10 +7,11 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from config.settings import oddsportal_league_urls
 from scrapers.browser import fetch_page
 
 ODDS_TRIPLE = re.compile(r"(\d+\.\d{2})\s+(\d+\.\d{2})\s+(\d+\.\d{2})\s*$")
-SCORE_PATTERN = re.compile(r"(\d+)\s*–\s*(\d+)")
+SCORE_PATTERN = re.compile(r"(\d+)\s*[–-]\s*(\d+)")
 
 
 def _load_wc_config() -> dict:
@@ -88,6 +89,62 @@ def scrape_oddsportal_page(url: str, div_code: str = "WC26") -> list[dict]:
         seen.add(key)
         matches.append(parsed)
     return matches
+
+
+def scrape_league_odds(
+    div_code: str,
+    *,
+    include_results: bool = True,
+    urls: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Scrape one league's fixtures (+ optional results) from OddsPortal."""
+    league_urls = urls or oddsportal_league_urls([div_code]).get(div_code)
+    if not league_urls:
+        print(f"OddsPortal: no URLs configured for {div_code}")
+        return pd.DataFrame()
+
+    targets = [league_urls["fixtures_url"]]
+    if include_results and league_urls.get("results_url"):
+        targets.append(league_urls["results_url"])
+
+    all_matches: list[dict] = []
+    for url in targets:
+        print(f"Scraping OddsPortal [{div_code}]: {url}")
+        all_matches.extend(scrape_oddsportal_page(url, div_code=div_code))
+
+    if not all_matches:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(all_matches).drop_duplicates(
+        subset=["HomeTeam", "AwayTeam"], keep="last",
+    )
+    print(f"Scraped {len(df)} matches for {div_code}")
+    return df
+
+
+def scrape_big5_odds(
+    div_codes: list[str] | None = None,
+    *,
+    include_results: bool = True,
+) -> pd.DataFrame:
+    """Scrape all configured Big 5 (or subset) leagues from OddsPortal."""
+    portal = oddsportal_league_urls(div_codes)
+    if not portal:
+        print("OddsPortal: no league URLs configured")
+        return pd.DataFrame()
+
+    frames = []
+    for code, urls in portal.items():
+        df = scrape_league_odds(code, include_results=include_results, urls=urls)
+        if not df.empty:
+            frames.append(df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+    print(f"OddsPortal Big 5 total: {len(combined)} matches across {len(frames)} leagues")
+    return combined
 
 
 def scrape_worldcup_odds(include_results: bool = True) -> pd.DataFrame:

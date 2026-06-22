@@ -165,7 +165,12 @@ def get_chaos_data(
         home_intel = fetch_team_intel(home_team, date_str, opponent=away_team)
         away_intel = fetch_team_intel(away_team, date_str, opponent=home_team)
 
-        odds = fetch_odds(home_team, away_team, date_str) or _odds_from_row(row)
+        div_code = row.get("Div") if hasattr(row, "get") else None
+        odds = fetch_odds(
+            home_team, away_team, date_str,
+            force_refresh=refresh,
+            div_code=str(div_code) if div_code else None,
+        ) or _odds_from_row(row)
 
         if injuries_df is not None and not injuries_df.empty:
             home_injury_count = len(

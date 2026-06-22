@@ -66,7 +66,8 @@ def load_cached() -> pd.DataFrame | None:
     return df if not df.empty else None
 
 
-def save_scrape(df: pd.DataFrame) -> None:
+def save_scrape(df: pd.DataFrame, div_filter: list[str] | None = None) -> None:
+    """Persist scrape rows. When div_filter is set, replace only those divisions."""
     ensure_odds_cache()
     scraped_at = datetime.now(UTC).isoformat()
     cols = [
@@ -79,10 +80,19 @@ def save_scrape(df: pd.DataFrame) -> None:
             out[col] = None
     out["scraped_at"] = scraped_at
     with engine.connect() as conn:
-        conn.execute(text(f"DELETE FROM {CACHE_TABLE}"))
+        if div_filter:
+            placeholders = ", ".join(f":d{i}" for i in range(len(div_filter)))
+            params = {f"d{i}": code for i, code in enumerate(div_filter)}
+            conn.execute(
+                text(f"DELETE FROM {CACHE_TABLE} WHERE Div IN ({placeholders})"),
+                params,
+            )
+        else:
+            conn.execute(text(f"DELETE FROM {CACHE_TABLE}"))
         conn.commit()
     out[cols + ["scraped_at"]].to_sql(CACHE_TABLE, engine, if_exists="append", index=False)
-    print(f"Odds cache saved: {len(out)} matches (TTL {ttl_hours():g}h)")
+    scope = f" ({', '.join(div_filter)})" if div_filter else ""
+    print(f"Odds cache saved: {len(out)} matches{scope} (TTL {ttl_hours():g}h)")
 
 
 def clear_cache() -> None:

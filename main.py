@@ -189,6 +189,9 @@ def explore_data() -> None:
     print(f"Completed: {completed}, Total: {len(df)}")
     print(league_summary())
     print(f"Chaos cache: {cache_stats()}")
+    from utils.odds_cache import cache_stats as odds_cache_stats
+
+    print(f"Odds cache: {odds_cache_stats()}")
     readiness = fixture_readiness(df)
     print(f"Live predict: {_fixture_guidance(readiness)}")
 
@@ -255,6 +258,14 @@ def main():
         "--dry-run", action="store_true",
         help="With --predict: score using ingested odds only (no live intel scrape)",
     )
+    parser.add_argument(
+        "--fetch-odds", action="store_true",
+        help="Scrape and cache live Big 5 odds from OddsPortal (Scrapling)",
+    )
+    parser.add_argument(
+        "--fetch-odds-league", type=str, default=None,
+        help="Scrape one league only (E0, SP1, D1, I1, F1) with --fetch-odds",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -263,7 +274,7 @@ def main():
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
         args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
-        args.kelly_sim, args.validate_live,
+        args.kelly_sim, args.validate_live, args.fetch_odds,
     ])
 
     print("Trismegistus is alive!")
@@ -330,6 +341,20 @@ def main():
     if args.fetch_elo:
         from scripts.fetch_elo import fetch_elo
         fetch_elo(div_filter=league_div_codes())
+    if args.fetch_odds:
+        from scripts.fetch_odds import fetch_big5_odds, fetch_league_odds
+        from utils.odds_cache import cache_stats
+
+        if args.fetch_odds_league:
+            code = args.fetch_odds_league.upper()
+            df = fetch_league_odds(code, include_results=True)
+        else:
+            df = fetch_big5_odds(
+                div_filter=league_div_codes(),
+                include_results=True,
+                force_refresh=True,
+            )
+        print(f"Fetched {len(df)} odds rows. Cache: {cache_stats()}")
     if args.tune_edge:
         from scripts.tune_edge import tune_edge
         tune_edge(limit=args.limit, use_cache=use_cache)

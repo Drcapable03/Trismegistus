@@ -1,4 +1,11 @@
-from config.settings import enabled_leagues, fixtures_url, league_urls, load_leagues_config
+from config.settings import (
+    enabled_leagues,
+    fixtures_url,
+    league_div_codes,
+    league_urls,
+    load_leagues_config,
+    oddsportal_league_urls,
+)
 
 
 def test_enabled_leagues_respects_flag():
@@ -19,3 +26,9 @@ def test_league_urls_include_historical_seasons():
 def test_fixtures_url():
     url = fixtures_url()
     assert "fixtures.csv" in url
+
+
+def test_oddsportal_urls_for_big5():
+    urls = oddsportal_league_urls(league_div_codes())
+    assert set(urls) == {"E0", "SP1", "D1", "I1", "F1"}
+    assert "premier-league" in urls["E0"]["fixtures_url"]

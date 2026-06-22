@@ -70,7 +70,8 @@ def _fixture_guidance(readiness: dict) -> str:
     return (
         "No upcoming Big 5 fixtures in DB (season may be between windows). "
         "Run `poetry run python main.py --ingest` after football-data.co.uk "
-        "publishes new fixtures.csv rows for 2626 (or current season)."
+        "publishes new fixtures.csv rows for 2626 (or current season). "
+        "Use `poetry run python main.py --fetch-odds` for live OddsPortal lines."
     )
 
 

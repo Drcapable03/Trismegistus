@@ -5,7 +5,9 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
+from config.settings import league_div_codes
 from utils.db import engine
+from utils.team_aliases import teams_match
 
 load_dotenv()
 
@@ -14,17 +16,17 @@ def _scrapling_enabled() -> bool:
     return os.getenv("TRIS_USE_SCRAPLING", "true").lower() in {"1", "true", "yes"}
 
 
+def _auto_scrape_odds() -> bool:
+    return os.getenv("TRIS_AUTO_SCRAPE_ODDS", "false").lower() in {"1", "true", "yes"}
+
+
 def _match_names(home: str, away: str, df: pd.DataFrame) -> pd.Series | None:
     if df.empty:
         return None
-    exact = df[(df["HomeTeam"] == home) & (df["AwayTeam"] == away)]
-    if not exact.empty:
-        return exact.iloc[0]
-    h, a = home.lower(), away.lower()
-    fuzzy = df[
-        df["HomeTeam"].str.lower().eq(h) & df["AwayTeam"].str.lower().eq(a)
-    ]
-    return fuzzy.iloc[0] if not fuzzy.empty else None
+    for _, row in df.iterrows():
+        if teams_match(home, row["HomeTeam"]) and teams_match(away, row["AwayTeam"]):
+            return row
+    return None
 
 
 def _load_odds_rows(home_team: str, away_team: str) -> pd.DataFrame:
@@ -53,17 +55,17 @@ def _load_odds_rows(home_team: str, away_team: str) -> pd.DataFrame:
     if not df.empty:
         return df
 
-    h, a = home_team.lower(), away_team.lower()
     try:
-        all_df = pd.read_sql(
-            f"SELECT {', '.join(base_cols + close_cols)} FROM matches",
-            engine,
-        )
+        all_df = pd.read_sql(f"SELECT {', '.join(base_cols + close_cols)} FROM matches", engine)
     except Exception:
         all_df = pd.read_sql(f"SELECT {', '.join(base_cols)} FROM matches", engine)
-    return all_df[
-        all_df["HomeTeam"].str.lower().eq(h) & all_df["AwayTeam"].str.lower().eq(a)
-    ]
+    if all_df.empty:
+        return all_df
+    mask = all_df.apply(
+        lambda r: teams_match(home_team, r["HomeTeam"]) and teams_match(away_team, r["AwayTeam"]),
+        axis=1,
+    )
+    return all_df[mask]
 
 
 def fetch_odds_from_db(home_team: str, away_team: str, date: str | None = None) -> dict | None:
@@ -109,21 +111,57 @@ def fetch_odds_from_db(home_team: str, away_team: str, date: str | None = None) 
         return None
 
 
+def _row_to_odds_dict(row: pd.Series, *, source: str) -> dict:
+    return {
+        "H": float(row["B365H"]),
+        "D": float(row["B365D"]),
+        "A": float(row["B365A"]),
+        "source": source,
+        "div": row.get("Div"),
+        "scraped_home": row.get("HomeTeam"),
+        "scraped_away": row.get("AwayTeam"),
+    }
+
+
 @lru_cache(maxsize=1)
-def _worldcup_odds_df(force_refresh: bool = False) -> pd.DataFrame:
-    from scrapers.oddsportal import scrape_worldcup_odds
-    from utils.odds_cache import is_fresh, load_cached, save_scrape
+def _scraped_odds_df_cached() -> pd.DataFrame:
+    from utils.odds_cache import load_cached
+
+    cached = load_cached()
+    return cached if cached is not None else pd.DataFrame()
+
+
+def _scraped_odds_df(force_refresh: bool = False) -> pd.DataFrame:
+    """Load cached OddsPortal scrape; live scrape only on force or TRIS_AUTO_SCRAPE_ODDS."""
+    from utils.odds_cache import load_cached
 
     if not force_refresh:
         cached = load_cached()
-        if cached is not None:
+        if cached is not None and not cached.empty:
             print(f"Odds cache hit: {len(cached)} matches")
             return cached
 
-    df = scrape_worldcup_odds(include_results=True)
+    if not force_refresh and not _auto_scrape_odds():
+        return pd.DataFrame()
+
+    from scripts.fetch_odds import fetch_big5_odds
+
+    df = fetch_big5_odds(force_refresh=True, include_results=True)
+    _scraped_odds_df_cached.cache_clear()
     if not df.empty:
-        save_scrape(df)
-    return df
+        return df
+
+    if force_refresh or _auto_scrape_odds():
+        from scrapers.oddsportal import scrape_worldcup_odds
+        from utils.odds_cache import save_scrape
+
+        wc = scrape_worldcup_odds(include_results=True)
+        if not wc.empty:
+            save_scrape(wc, div_filter=["WC26"])
+        _scraped_odds_df_cached.cache_clear()
+        return wc
+
+    return pd.DataFrame()
 
 
 def fetch_odds_scraped(
@@ -132,14 +170,27 @@ def fetch_odds_scraped(
     date: str | None = None,
     *,
     force_refresh: bool = False,
+    div_code: str | None = None,
 ) -> dict | None:
     try:
-        df = _worldcup_odds_df(force_refresh=force_refresh)
-        row = _match_names(home_team, away_team, df)
+        df = _scraped_odds_df(force_refresh=force_refresh)
+        if df.empty:
+            print(f"Scraped odds: cache empty for {home_team} vs {away_team}")
+            return None
+
+        scoped = df
+        if div_code and "Div" in df.columns:
+            league_rows = df[df["Div"] == div_code]
+            if not league_rows.empty:
+                scoped = league_rows
+
+        row = _match_names(home_team, away_team, scoped)
+        if row is None and scoped is not df:
+            row = _match_names(home_team, away_team, df)
         if row is None:
             print(f"Scraped odds: no match for {home_team} vs {away_team}")
             return None
-        return {"H": row["B365H"], "D": row["B365D"], "A": row["B365A"], "source": "oddsportal"}
+        return _row_to_odds_dict(row, source="oddsportal")
     except Exception as e:
         print(f"Scraped odds failed: {e}")
         return None
@@ -150,12 +201,15 @@ def fetch_odds_api(home_team: str, away_team: str, date: str) -> dict | None:
     if not api_key:
         return None
 
-    sports = [
-        "soccer_epl",
-        "soccer_netherlands_eredivisie",
-        "soccer_fifa_world_cup",
-    ]
-    for sport in sports:
+    sports = {
+        "E0": "soccer_epl",
+        "SP1": "soccer_spain_la_liga",
+        "D1": "soccer_germany_bundesliga",
+        "I1": "soccer_italy_serie_a",
+        "F1": "soccer_france_ligue_one",
+        "WC26": "soccer_fifa_world_cup",
+    }
+    for sport in sports.values():
         url = (
             f"https://api.the-odds-api.com/v4/sports/{sport}/odds/"
             f"?apiKey={api_key}&regions=eu&markets=h2h&date={date}"
@@ -164,7 +218,7 @@ def fetch_odds_api(home_team: str, away_team: str, date: str) -> dict | None:
         if response.status_code != 200:
             continue
         for event in response.json():
-            if event["home_team"] == home_team and event["away_team"] == away_team:
+            if teams_match(home_team, event["home_team"]) and teams_match(away_team, event["away_team"]):
                 odds = event["bookmakers"][0]["markets"][0]["outcomes"]
                 return {"H": odds[0]["price"], "A": odds[1]["price"], "D": odds[2]["price"], "source": "odds_api"}
     return None
@@ -176,6 +230,7 @@ def fetch_odds(
     date: str,
     *,
     force_refresh: bool = False,
+    div_code: str | None = None,
 ) -> dict | None:
     """DB (ingested B365) → cached/live OddsPortal scrape → The Odds API."""
     db_odds = fetch_odds_from_db(home_team, away_team, date)
@@ -187,9 +242,16 @@ def fetch_odds(
         return db_odds
 
     if _scrapling_enabled():
-        scraped = fetch_odds_scraped(home_team, away_team, date, force_refresh=force_refresh)
+        scraped = fetch_odds_scraped(
+            home_team, away_team, date,
+            force_refresh=force_refresh,
+            div_code=div_code,
+        )
         if scraped:
-            print(f"Odds via OddsPortal: {home_team} vs {away_team} -> H={scraped['H']}")
+            print(
+                f"Odds via OddsPortal ({scraped['source']}): {home_team} vs {away_team} "
+                f"-> H={scraped['H']}"
+            )
             return scraped
 
     api = fetch_odds_api(home_team, away_team, date)
@@ -202,6 +264,6 @@ def fetch_odds(
 
 
 def clear_odds_cache() -> None:
-    _worldcup_odds_df.cache_clear()
+    _scraped_odds_df_cached.cache_clear()
     from utils.odds_cache import clear_cache
     clear_cache()

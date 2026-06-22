@@ -68,6 +68,14 @@ def league_div_codes() -> list[str]:
     return [info["code"] for info in enabled_leagues().values()]
 
 
+def oddsportal_league_urls(div_codes: list[str] | None = None) -> dict[str, dict[str, str]]:
+    """OddsPortal fixture/results URLs keyed by football-data Div code."""
+    cfg = load_leagues_config()
+    portal = cfg.get("oddsportal") or {}
+    codes = div_codes or league_div_codes()
+    return {code: portal[code] for code in codes if code in portal}
+
+
 def chaos_config() -> dict:
     cfg = load_leagues_config()
     return cfg.get("chaos") or {}

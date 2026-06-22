@@ -100,3 +100,21 @@ leagues:
     code: G1
     country: GRE
     enabled: false
+
+# Phase 6B: OddsPortal scrape targets for live Big 5 odds (Scrapling)
+oddsportal:
+  E0:
+    fixtures_url: "https://www.oddsportal.com/football/england/premier-league/"
+    results_url: "https://www.oddsportal.com/football/england/premier-league/results/"
+  SP1:
+    fixtures_url: "https://www.oddsportal.com/football/spain/laliga/"
+    results_url: "https://www.oddsportal.com/football/spain/laliga/results/"
+  D1:
+    fixtures_url: "https://www.oddsportal.com/football/germany/bundesliga/"
+    results_url: "https://www.oddsportal.com/football/germany/bundesliga/results/"
+  I1:
+    fixtures_url: "https://www.oddsportal.com/football/italy/serie-a/"
+    results_url: "https://www.oddsportal.com/football/italy/serie-a/results/"
+  F1:
+    fixtures_url: "https://www.oddsportal.com/football/france/ligue-1/"
+    results_url: "https://www.oddsportal.com/football/france/ligue-1/results/"

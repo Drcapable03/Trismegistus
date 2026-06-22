@@ -1,4 +1,63 @@
 # football-data.co.uk HomeTeam name -> external source names
+oddsportal:
+  Man United: Manchester Utd
+  Man City: Manchester City
+  Nott'm Forest: Nottingham
+  Wolves: Wolves
+  Paris SG: Paris SG
+  Ein Frankfurt: Eintracht Frankfurt
+  Ath Madrid: Atletico Madrid
+  Ath Bilbao: Athletic Club
+  M'gladbach: M'gladbach
+  Newcastle: Newcastle Utd
+  Brighton: Brighton
+  Leicester: Leicester
+  Leeds: Leeds
+  West Ham: West Ham
+  Tottenham: Tottenham
+  Bournemouth: Bournemouth
+  Crystal Palace: Crystal Palace
+  Aston Villa: Aston Villa
+  Sunderland: Sunderland
+  Ipswich: Ipswich
+  Hull: Hull
+  Coventry: Coventry
+  Sociedad: Real Sociedad
+  Betis: Real Betis
+  Celta: Celta Vigo
+  Vallecano: Rayo Vallecano
+  Alaves: Alaves
+  Dortmund: Dortmund
+  Leverkusen: Leverkusen
+  Hoffenheim: Hoffenheim
+  Stuttgart: Stuttgart
+  Werder Bremen: Werder Bremen
+  Wolfsburg: Wolfsburg
+  Freiburg: Freiburg
+  Mainz: Mainz
+  Augsburg: Augsburg
+  Union Berlin: Union Berlin
+  Milan: AC Milan
+  Inter: Inter
+  Napoli: Napoli
+  Roma: Roma
+  Lazio: Lazio
+  Atalanta: Atalanta
+  Fiorentina: Fiorentina
+  Bologna: Bologna
+  Torino: Torino
+  Lyon: Lyon
+  Marseille: Marseille
+  Lille: Lille
+  Monaco: Monaco
+  Nice: Nice
+  Lens: Lens
+  Rennes: Rennes
+  Strasbourg: Strasbourg
+  Nantes: Nantes
+  Toulouse: Toulouse
+  Brest: Brest
+
 understat:
   Man United: Manchester United
   Man City: Manchester City

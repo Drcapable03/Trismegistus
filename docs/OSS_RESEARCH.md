@@ -69,7 +69,9 @@ Historical OddsPortal odds.
 | 1b | expandable leagues config | Done |
 | 2 | Scrapling (OddsPortal, news, injuries) | **Done** |
 | 2 | soccerdata (Understat xG, Club Elo) | Deferred — dep conflict with scrapling |
-| 2 | penaltyblog (Shin implied odds) | Optional upgrade |
+| 2 | penaltyblog (Shin implied odds) | **Done** (Shin de-vig) |
+| 6B | OddsPortal Big 5 live odds (`--fetch-odds`) | **Done** |
+| 6B | OddsHarvester | Not adopted — Scrapling OddsPortal used instead |
 | 3 | FastAPI platform | Planned |
 
 ## Cost summary
