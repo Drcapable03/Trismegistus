@@ -208,6 +208,34 @@ def dixon_coles_blend_weight() -> float:
     return float(get_env("DIXON_COLES_BLEND_WEIGHT", "0.05"))
 
 
+def set_dixon_coles_blend_weight(weight: float) -> None:
+    """Persist tuned Dixon-Coles blend weight to config/leagues.yaml."""
+    import re
+
+    config_path = ROOT / "config" / "leagues.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    value = round(float(weight), 3)
+    if re.search(r"^\s*dixon_coles_blend_weight:\s*[\d.]+", text, re.MULTILINE):
+        text = re.sub(
+            r"^(\s*dixon_coles_blend_weight:\s*)[\d.]+",
+            rf"\g<1>{value}",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+    else:
+        anchor = "model:\n"
+        if anchor not in text:
+            text = text.rstrip() + f"\n\nmodel:\n  dixon_coles_blend_weight: {value}\n"
+        else:
+            text = text.replace(
+                anchor,
+                f"{anchor}  dixon_coles_blend_weight: {value}\n",
+                1,
+            )
+    config_path.write_text(text, encoding="utf-8")
+
+
 def kelly_fraction() -> float:
     cfg = load_leagues_config()
     model_cfg = cfg.get("model") or {}

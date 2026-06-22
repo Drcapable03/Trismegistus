@@ -173,6 +173,34 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 005 — 2026-06-22 (Phase 6D — Dixon-Coles blend tuning)
+
+### Completed
+- `scripts/tune_dc_blend.py` — grid-search `dixon_coles_blend_weight` (0.0–0.30) on walk-forward holdout; optimizes selective ROI
+- `set_dixon_coles_blend_weight()` in `config/settings.py`
+- CLI: `--tune-dc-blend`
+- `tests/test_tune_dc_blend.py` — persist helper, DC compose blend, mocked ROI selection
+
+### Tuned result
+- Holdout sweep (700 test matches, selective edge picks): best ROI at **w=0.10** (−17.6% on 41 bets vs −20.7% at w=0.05)
+- `config/leagues.yaml` updated: `dixon_coles_blend_weight: 0.1`
+
+### Verified run
+```
+poetry run python main.py --ingest --limit 0
+poetry run python main.py --tune-dc-blend --limit 0
+# Saved dixon_coles_blend_weight=0.100
+poetry run pytest tests/ -q
+# 91 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Phase 6E: Expand historical seasons
+2. Add Reddit creds to `.env` and re-run `--calibrate-intel`
+3. Populate chaos intel cache via `--predict --refresh-cache` when fixtures land
+
+---
+
 ## Template for next entry
 
 ```

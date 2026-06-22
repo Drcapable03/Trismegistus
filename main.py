@@ -247,6 +247,10 @@ def main():
         help="Tune per-league edge margins on selective holdout ROI",
     )
     parser.add_argument(
+        "--tune-dc-blend", action="store_true",
+        help="Grid-search Dixon-Coles blend weight on selective holdout ROI",
+    )
+    parser.add_argument(
         "--kelly-sim", action="store_true",
         help="Run fractional Kelly bankroll sim on selective holdout picks",
     )
@@ -286,6 +290,7 @@ def main():
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
         args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
+        args.tune_dc_blend,
         args.kelly_sim, args.validate_live, args.fetch_odds,
         args.calibrate_intel, args.intel_roi,
     ])
@@ -384,6 +389,9 @@ def main():
     if args.tune_edge_leagues:
         from scripts.tune_edge_leagues import tune_edge_leagues
         tune_edge_leagues(limit=args.limit, use_cache=use_cache)
+    if args.tune_dc_blend:
+        from scripts.tune_dc_blend import tune_dc_blend
+        tune_dc_blend(limit=args.limit, use_cache=use_cache)
     if args.kelly_sim:
         from evaluation.kelly import kelly_simulation
         from config.settings import kelly_fraction
