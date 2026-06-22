@@ -107,6 +107,7 @@ def run_predict(
     refresh_cache: bool = False,
     model_path: str | None = None,
     edge_margin: float | None = None,
+    dry_run: bool = False,
 ) -> None:
     div_codes = league_div_codes()
     matches = read_matches()
@@ -127,10 +128,13 @@ def run_predict(
         print(f"Edge filter: per-league margins {margins}")
     else:
         print(f"Edge filter: global ≥{edge_margin_min():.0%} vs closing implied")
-    print(
-        "Live intel: ON (news/Reddit/YouTube)"
-        + (" — refreshing cache" if refresh_cache else " — cache + live fetch on miss")
-    )
+    if dry_run:
+        print("Dry run: ON — ingested odds only, no live intel/odds scrape")
+    else:
+        print(
+            "Live intel: ON (news/Reddit/YouTube)"
+            + (" — refreshing cache" if refresh_cache else " — cache + live fetch on miss")
+        )
 
     forger = GameForger()
     if model_path:
@@ -160,7 +164,7 @@ def run_predict(
         use_cache=use_cache,
         refresh_cache=refresh_cache,
         div_filter=div_codes,
-        chaos_cache_only=False,
+        chaos_cache_only=dry_run,
     )
     predictions = forger.predict(
         confidence_threshold=confidence,
@@ -176,6 +180,8 @@ def run_predict(
 
 
 def explore_data() -> None:
+    from scripts.validate_live_predict import fixture_readiness, _fixture_guidance
+
     df = read_matches()
     print(df.head())
     print(df.columns.tolist())
@@ -183,6 +189,8 @@ def explore_data() -> None:
     print(f"Completed: {completed}, Total: {len(df)}")
     print(league_summary())
     print(f"Chaos cache: {cache_stats()}")
+    readiness = fixture_readiness(df)
+    print(f"Live predict: {_fixture_guidance(readiness)}")
 
 
 def main():
@@ -239,6 +247,14 @@ def main():
         "--kelly-sim", action="store_true",
         help="Run fractional Kelly bankroll sim on selective holdout picks",
     )
+    parser.add_argument(
+        "--validate-live", action="store_true",
+        help="Run live-predict pre-flight checks and E2E smoke test",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="With --predict: score using ingested odds only (no live intel scrape)",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -247,7 +263,7 @@ def main():
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
         args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
-        args.kelly_sim,
+        args.kelly_sim, args.validate_live,
     ])
 
     print("Trismegistus is alive!")
@@ -267,6 +283,15 @@ def main():
             path = latest_model_path()
             if path:
                 print(f"Tip: use --save-model to persist, or --load-model {path}")
+    if args.validate_live:
+        from scripts.validate_live_predict import run_validate_live
+
+        exit_code = run_validate_live(
+            train_limit=args.limit if args.limit > 0 else 80,
+            injuries_df=DEFAULT_INJURIES,
+        )
+        if exit_code != 0:
+            raise SystemExit(exit_code)
     if args.predict:
         run_predict(
             confidence=args.confidence,
@@ -276,6 +301,7 @@ def main():
             refresh_cache=args.refresh_cache,
             model_path=args.load_model,
             edge_margin=args.edge_margin,
+            dry_run=args.dry_run,
         )
     if args.worldcup_scrape:
         from scripts.worldcup_pipeline import test_scrape_sample

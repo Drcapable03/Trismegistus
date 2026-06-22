@@ -82,6 +82,45 @@ poetry run python main.py --reset --ingest --backtest --limit 30
 
 ---
 
+## Entry 002 — 2026-06-22 (Post-Phase-5 roadmap: Phase 6A)
+
+### Completed since last handoff
+- Phases 1–5 + live `--predict` wiring (commits through `063ede4`)
+- **Phase 6A — Live predict validation** (`phase6a:` commit pending)
+  - `scripts/validate_live_predict.py` — pre-flight checks + E2E smoke test
+  - CLI: `--validate-live`, `--predict --dry-run` (ingested odds only, no live scrape)
+  - `--explore` now reports fixture readiness guidance
+  - Bug fix: `_feature_row_df()` aligns Series→DataFrame for GBC/Poisson predict (NaN crash)
+  - `_is_completed()` handles missing `FTR` column (fixtures rows)
+
+### Current blockers
+- **No upcoming Big 5 fixtures** — football-data.co.uk `fixtures.csv` has no E0/SP1/D1/I1/F1 rows yet (season window). Re-ingest when 2626 fixtures appear.
+- Club Elo API still flaky (503 → 1500 fallback)
+- `soccerdata` still skipped (cssselect vs scrapling)
+
+### Remaining roadmap (6 phases, no UI)
+1. ~~Live predict validation~~ **Done (6A)**
+2. Big 5 live odds scrape (OddsHarvester / Scrapling OddsPortal)
+3. Intel calibration (Reddit creds, YouTube channels, optional ROI harness)
+4. Retune Dixon-Coles blend weight
+5. Expand historical seasons
+6. Secondary enrichment (FBref / StatsBomb — only if ROI still flat)
+
+### Verified run (2026-06-22)
+```
+poetry run python main.py --validate-live --limit 80
+# 7/7 checks passed (E2E smoke: Liverpool vs Brentford synthetic fixture)
+poetry run pytest tests/ -q
+# 74 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Phase 6B: Big 5 live odds scrape
+2. Re-run `--predict --limit 0` when new-season fixtures land
+3. Update `docs/OSS_RESEARCH.md` integration table
+
+---
+
 ## Template for next entry
 
 ```

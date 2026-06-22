@@ -54,6 +54,8 @@ def _parse_dates(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _is_completed(df: pd.DataFrame) -> pd.Series:
+    if "FTR" not in df.columns:
+        return pd.Series(False, index=df.index)
     return df["FTR"].isin(["H", "D", "A"])
 
 
@@ -439,8 +441,13 @@ class GameForger:
             divs = div_filter
         self.dc_baseline.fit(self.train_matches, div_codes=divs)
 
+    def _feature_row_df(self, features, columns: list[str]) -> pd.DataFrame:
+        if isinstance(features, pd.Series):
+            return features.to_frame().T.reindex(columns=columns, fill_value=0).fillna(0)
+        return pd.DataFrame([features], columns=columns).fillna(0)
+
     def _raw_model_probs(self, outcome_features) -> np.ndarray:
-        outcome_df = pd.DataFrame([outcome_features], columns=self.outcome_features)
+        outcome_df = self._feature_row_df(outcome_features, self.outcome_features)
         return self.calibrator.predict_proba(self.outcome_model, outcome_df)
 
     def _compose_final_probs(
@@ -621,7 +628,7 @@ class GameForger:
         away_team: str | None = None,
         div: str | None = None,
     ):
-        goals_df = pd.DataFrame([goals_features], columns=self.goals_features)
+        goals_df = self._feature_row_df(goals_features, self.goals_features)
         final, _, _ = self.predict_outcome_probs(
             outcome_features,
             b365=b365,
@@ -640,6 +647,7 @@ class GameForger:
         confidence_threshold: float = 75.0,
         edge_margin: float | None = None,
         use_simulation: bool = False,
+        require_edge: bool = True,
     ) -> list[dict]:
         if self.prediction_data is None:
             raise ValueError("Run prepare_prediction_data() with future matches first")
@@ -654,7 +662,7 @@ class GameForger:
             b365 = resolve_b365_for_live(row)
             b365_open, b365_close = opening_and_closing_from_row(row)
             margin_used = self._edge_margin_for_div(div, edge_margin)
-            goals_df = pd.DataFrame([X_goals.iloc[i]], columns=self.goals_features)
+            goals_df = self._feature_row_df(X_goals.iloc[i], self.goals_features)
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
 
             evaluated = self._evaluate_row(
@@ -662,7 +670,7 @@ class GameForger:
                 b365,
                 None,
                 edge_margin,
-                require_edge=True,
+                require_edge=require_edge,
                 div=div,
                 home_team=row["HomeTeam"],
                 away_team=row["AwayTeam"],
@@ -762,7 +770,7 @@ class GameForger:
             pred, confidence, edge, final = evaluated
             if confidence < confidence_threshold:
                 continue
-            goals_df = pd.DataFrame([X_test_g.iloc[i]], columns=self.goals_features)
+            goals_df = self._feature_row_df(X_test_g.iloc[i], self.goals_features)
             expected_goals = max(0.0, float(self.goals_model.predict(goals_df)[0]))
             actual = OUTCOME_MAP.get(row["FTR"], -1)
             bookie_code = bookie_favorite(*b365) if b365 else None
