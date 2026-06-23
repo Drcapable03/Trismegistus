@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routers import backtest, health, predictions, status, ui
@@ -35,8 +36,11 @@ def create_app() -> FastAPI:
     app.include_router(predictions.router)
     app.include_router(backtest.router)
 
-    @app.get("/", response_model=RootResponse, tags=["meta"])
-    def root() -> RootResponse:
+    @app.get("/", tags=["meta"])
+    def root(request: Request):
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept.lower():
+            return RedirectResponse(url="/ui", status_code=302)
         return RootResponse(
             name="Trismegistus",
             version="0.3.0",

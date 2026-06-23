@@ -22,12 +22,18 @@ def test_health_endpoint():
 
 
 def test_root_lists_endpoints():
-    response = _client().get("/")
+    response = _client().get("/", headers={"Accept": "application/json"})
     assert response.status_code == 200
     body = response.json()
     assert body["name"] == "Trismegistus"
     assert body["ui"] == "/ui"
     assert "/predictions" in body["endpoints"]["predictions"]
+
+
+def test_root_redirects_browsers_to_ui():
+    response = _client().get("/", headers={"Accept": "text/html"}, follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/ui"
 
 
 def test_ui_dashboard_served():
