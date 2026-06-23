@@ -248,6 +248,12 @@ def main():
         help="Regenerate config/team_cities.yaml for Big 5 teams",
     )
     parser.add_argument("--fetch-xg", action="store_true", help="Cache Understat match xG into SQLite")
+    parser.add_argument("--fetch-fbref", action="store_true", help="Cache FBref match xG into SQLite")
+    parser.add_argument("--fetch-statsbomb", action="store_true", help="Cache StatsBomb open-data match xG")
+    parser.add_argument(
+        "--fetch-statsbomb-limit", type=int, default=0,
+        help="Max matches per open season with --fetch-statsbomb (0 = all)",
+    )
     parser.add_argument("--fetch-elo", action="store_true", help="Cache Club Elo ratings into SQLite")
     parser.add_argument(
         "--tune-edge", action="store_true",
@@ -297,6 +303,10 @@ def main():
         "--intel-roi", action="store_true",
         help="Report chaos-cache intel coverage and holdout ablation ROI",
     )
+    parser.add_argument(
+        "--enrichment-roi", action="store_true",
+        help="Report xG enrichment coverage and holdout ablation ROI",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -304,10 +314,11 @@ def main():
         args.ingest, args.predict, args.backtest, args.explore,
         args.worldcup_scrape, args.worldcup_ingest, args.worldcup_predict,
         args.tune_blend, args.tune_leagues, args.archive_chaos, args.build_cities,
-        args.fetch_xg, args.fetch_elo, args.tune_edge, args.tune_edge_leagues,
+        args.fetch_xg, args.fetch_fbref, args.fetch_statsbomb, args.fetch_elo,
+        args.tune_edge, args.tune_edge_leagues,
         args.tune_dc_blend, args.expand_history,
         args.kelly_sim, args.validate_live, args.fetch_odds,
-        args.calibrate_intel, args.intel_roi,
+        args.calibrate_intel, args.intel_roi, args.enrichment_roi,
     ])
 
     print("Trismegistus is alive!")
@@ -371,6 +382,12 @@ def main():
     if args.fetch_xg:
         from scripts.fetch_xg import fetch_xg
         fetch_xg()
+    if args.fetch_fbref:
+        from scripts.fetch_fbref import fetch_fbref
+        fetch_fbref()
+    if args.fetch_statsbomb:
+        from scripts.fetch_statsbomb import fetch_statsbomb
+        fetch_statsbomb(max_matches_per_season=args.fetch_statsbomb_limit)
     if args.fetch_elo:
         from scripts.fetch_elo import fetch_elo
         fetch_elo(div_filter=league_div_codes())
@@ -410,6 +427,12 @@ def main():
     if args.expand_history:
         from scripts.expand_history import expand_history
         expand_history()
+    if args.enrichment_roi:
+        from scripts.enrichment_roi import run_enrichment_roi
+        run_enrichment_roi(
+            limit=args.limit if args.limit > 0 else 200,
+            use_cache=use_cache,
+        )
     if args.kelly_sim:
         from evaluation.kelly import kelly_simulation
         from config.settings import kelly_fraction

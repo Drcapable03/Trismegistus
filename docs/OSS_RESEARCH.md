@@ -72,6 +72,9 @@ Historical OddsPortal odds.
 | 2 | penaltyblog (Shin implied odds) | **Done** (Shin de-vig) |
 | 6B | OddsPortal Big 5 live odds (`--fetch-odds`) | **Done** |
 | 6B | OddsHarvester | Not adopted — Scrapling OddsPortal used instead |
+| 6F | StatsBomb open data (`statsbombpy` via penaltyblog dep) | **Done** |
+| 6F | FBref xG (penaltyblog scraper) | **Done** (403-blocked live; cache ready) |
+| 2 | soccerdata (unified scrapers) | Still deferred — cssselect vs scrapling |
 | 3 | FastAPI platform | Planned |
 
 ## Cost summary

@@ -3,7 +3,7 @@
 import pandas as pd
 
 from utils.elo_cache import ELO_DEFAULT, elo_on_date, load_elo_history
-from utils.xg_cache import load_xg_matches
+from utils.xg_sources import load_xg_caches_by_priority
 
 H2H_DEFAULTS = {
     "h2h_home_win_pct": 0.46,
@@ -67,7 +67,7 @@ def _match_xg_proxy(hst: float, ast: float, hs: float, as_: float) -> tuple[floa
     return home_xg, away_xg
 
 
-def _team_xg_prior_understat(xg_df: pd.DataFrame, team: str, before: pd.Timestamp) -> dict[str, float] | None:
+def _team_xg_prior_cached(xg_df: pd.DataFrame, team: str, before: pd.Timestamp) -> dict[str, float] | None:
     if xg_df.empty:
         return None
     xg_df = xg_df.copy()
@@ -148,9 +148,22 @@ def _team_shot_prior(history: pd.DataFrame, team: str, before: pd.Timestamp) -> 
     }
 
 
+def _team_xg_prior_enriched(
+    caches: list[tuple[str, pd.DataFrame]],
+    team: str,
+    before: pd.Timestamp,
+) -> dict[str, float] | None:
+    for _, xg_df in caches:
+        prior = _team_xg_prior_cached(xg_df, team, before)
+        if prior:
+            return prior
+    return None
+
+
 def compute_pit_form_and_h2h(
     target: pd.DataFrame,
     history: pd.DataFrame,
+    enrichment_xg: bool = True,
 ) -> pd.DataFrame:
     """Attach PIT form + h2h columns; history must be completed matches only."""
     out = target.copy()
@@ -170,7 +183,7 @@ def compute_pit_form_and_h2h(
     xg_for_away, xg_against_away = [], []
     h2h_win, h2h_hg, h2h_ag = [], [], []
     has_shots = all(c in hist.columns for c in SHOT_COLS)
-    xg_cache = load_xg_matches()
+    xg_caches = load_xg_caches_by_priority() if enrichment_xg else []
     elo_hist = load_elo_history()
     elo_home, elo_away, elo_diff = [], [], []
 
@@ -191,16 +204,16 @@ def compute_pit_form_and_h2h(
         elo_away.append(ea)
         elo_diff.append(eh - ea)
 
-        hxg_u = _team_xg_prior_understat(xg_cache, home, dt)
-        axg_u = _team_xg_prior_understat(xg_cache, away, dt)
-        if hxg_u:
-            hxg = hxg_u
+        hxg_e = _team_xg_prior_enriched(xg_caches, home, dt) if xg_caches else None
+        axg_e = _team_xg_prior_enriched(xg_caches, away, dt) if xg_caches else None
+        if hxg_e:
+            hxg = hxg_e
         elif has_shots:
             hxg = _team_xg_prior(hist, home, dt)
         else:
             hxg = {"avg_xg_for": XG_DEFAULTS["avg_xg_for"], "avg_xg_against": XG_DEFAULTS["avg_xg_against"]}
-        if axg_u:
-            axg = axg_u
+        if axg_e:
+            axg = axg_e
         elif has_shots:
             axg = _team_xg_prior(hist, away, dt)
         else:

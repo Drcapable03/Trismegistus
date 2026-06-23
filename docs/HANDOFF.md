@@ -230,6 +230,39 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 007 — 2026-06-22 (Phase 6F — Secondary xG enrichment)
+
+### Completed
+- StatsBomb open-data cache (`utils/statsbomb_cache.py`) — xG aggregated from shot events via `statsbombpy`
+- FBref cache (`utils/fbref_cache.py`) + `scripts/fetch_fbref.py` via penaltyblog (graceful 403 fallback)
+- Unified xG priority loader (`utils/xg_sources.py`): understat → statsbomb → fbref → shots proxy
+- PIT features + `GameForger.train(enrichment_xg=...)` ablation flag
+- `scripts/enrichment_roi.py` — per-source holdout coverage + enriched vs shots-only ROI
+- CLI: `--fetch-fbref`, `--fetch-statsbomb`, `--fetch-statsbomb-limit`, `--enrichment-roi`
+- `config/leagues.yaml` `enrichment.xg_source_priority`
+
+### Notes
+- FBref returns 403 in this environment (bot block) — cache path ready when reachable
+- StatsBomb open data covers limited Big 5 seasons (La Liga depth best; EPL sparse)
+- Full `--fetch-statsbomb` is slow (1 events API call per match); use `--fetch-statsbomb-limit` for smoke tests
+
+### Verified run
+```
+poetry run python main.py --fetch-statsbomb --fetch-statsbomb-limit 3
+# 77 matches cached across open Big 5 seasons
+poetry run python main.py --enrichment-roi --limit 100
+# coverage report + ablation harness
+poetry run pytest tests/ -q
+# 104 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Run full `--fetch-statsbomb` + `--fetch-xg` to maximize holdout xG overlap
+2. Phase 3: FastAPI platform (post-Phase-6 roadmap complete)
+3. Populate chaos intel cache via `--predict --refresh-cache` when fixtures land
+
+---
+
 ## Template for next entry
 
 ```

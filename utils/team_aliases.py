@@ -10,7 +10,7 @@ _ALIASES_PATH = ROOT / "config" / "team_aliases.yaml"
 
 def _load_aliases() -> dict:
     if not _ALIASES_PATH.exists():
-        return {"understat": {}, "club_elo": {}, "oddsportal": {}}
+        return {"understat": {}, "club_elo": {}, "oddsportal": {}, "fbref": {}, "statsbomb": {}}
     with open(_ALIASES_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
@@ -35,6 +35,18 @@ def from_understat(title: str) -> str:
 
 def from_oddsportal(title: str) -> str:
     mapping = _load_aliases().get("oddsportal", {})
+    reverse = {v: k for k, v in mapping.items()}
+    return reverse.get(title, title)
+
+
+def from_fbref(title: str) -> str:
+    mapping = _load_aliases().get("fbref", {})
+    reverse = {v: k for k, v in mapping.items()}
+    return reverse.get(title, title)
+
+
+def from_statsbomb(title: str) -> str:
+    mapping = _load_aliases().get("statsbomb", {})
     reverse = {v: k for k, v in mapping.items()}
     return reverse.get(title, title)
 

@@ -18,6 +18,13 @@ historical_seasons:
 
 fixtures_url: "https://www.football-data.co.uk/fixtures.csv"
 
+# Phase 6F: secondary xG enrichment (StatsBomb open data + FBref when reachable)
+enrichment:
+  xg_source_priority:
+    - understat
+    - statsbomb
+    - fbref
+
 # Tuned on league holdout via scripts/tune_blend.py (override with BOOKIE_BLEND_WEIGHT env)
 model:
   devig_method: shin

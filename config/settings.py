@@ -169,6 +169,49 @@ def understat_league_map() -> dict[str, str]:
     }
 
 
+def enrichment_config() -> dict:
+    cfg = load_leagues_config()
+    return cfg.get("enrichment") or {}
+
+
+def fbref_competition_map() -> dict[str, str]:
+    cfg = enrichment_config()
+    defaults = {
+        "E0": "ENG Premier League",
+        "SP1": "ESP La Liga",
+        "D1": "DEU Bundesliga 1",
+        "I1": "ITA Serie A",
+        "F1": "FRA Ligue 1",
+    }
+    raw = cfg.get("fbref_competitions") or {}
+    return {**defaults, **{str(k): str(v) for k, v in raw.items()}}
+
+
+def fbref_season_label(season_code: str) -> str:
+    s = str(season_code)
+    if len(s) == 4 and s.isdigit():
+        return f"20{s[:2]}-20{s[2:]}"
+    return s
+
+
+def statsbomb_competition_to_div() -> dict[str, str]:
+    return {
+        "Premier League": "E0",
+        "La Liga": "SP1",
+        "1. Bundesliga": "D1",
+        "Serie A": "I1",
+        "Ligue 1": "F1",
+    }
+
+
+def xg_source_priority() -> list[str]:
+    cfg = enrichment_config()
+    raw = cfg.get("xg_source_priority")
+    if raw:
+        return [str(s) for s in raw]
+    return ["understat", "statsbomb", "fbref"]
+
+
 def historical_understat_seasons() -> list[str]:
     cfg = load_leagues_config()
     if cfg.get("understat_seasons"):

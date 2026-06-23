@@ -124,6 +124,7 @@ def _merge_features(
     refresh_cache: bool = False,
     div_filter: str | list[str] | None = None,
     chaos_cache_only: bool = False,
+    enrichment_xg: bool = True,
 ) -> pd.DataFrame:
     matches = _parse_dates(matches.copy())
     matches["Date"] = _date_str_col(matches)
@@ -133,7 +134,7 @@ def _merge_features(
     completed_history = all_matches[_is_completed(all_matches)].copy()
     completed_history["Date"] = _date_str_col(completed_history)
 
-    data = compute_pit_form_and_h2h(matches, completed_history)
+    data = compute_pit_form_and_h2h(matches, completed_history, enrichment_xg=enrichment_xg)
     chaos = get_chaos_data(
         matches,
         injuries_df=injuries_df,
@@ -268,6 +269,7 @@ class GameForger:
         div_filter: str | list[str] | None = None,
         chaos_cache_only: bool = True,
         test_fraction: float = DEFAULT_TEST_FRACTION,
+        enrichment_xg: bool = True,
     ):
         matches = _parse_dates(pd.read_sql("SELECT * FROM matches", engine))
         matches = _apply_div_filter(matches, div_filter)
@@ -286,6 +288,7 @@ class GameForger:
             refresh_cache=refresh_cache,
             div_filter=div_filter,
             chaos_cache_only=chaos_cache_only,
+            enrichment_xg=enrichment_xg,
         ).reset_index(drop=True)
         completed_dates = completed["Date"].copy()
         outcome_cols, goals_cols = self._model_feature_columns(data)
@@ -408,6 +411,7 @@ class GameForger:
         refresh_cache: bool = False,
         div_filter: str | list[str] | None = None,
         chaos_cache_only: bool = True,
+        enrichment_xg: bool = True,
     ):
         if self.train_data is None:
             self.prepare_training_data(
@@ -417,6 +421,7 @@ class GameForger:
                 refresh_cache=refresh_cache,
                 div_filter=div_filter,
                 chaos_cache_only=chaos_cache_only,
+                enrichment_xg=enrichment_xg,
             )
         X_train_o, y_train_o, X_train_g, y_train_g = self.train_data
         n_cal = max(10, int(len(X_train_o) * CALIBRATION_FRACTION))
