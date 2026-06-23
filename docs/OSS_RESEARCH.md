@@ -75,7 +75,7 @@ Historical OddsPortal odds.
 | 6F | StatsBomb open data (`statsbombpy` via penaltyblog dep) | **Done** |
 | 6F | FBref xG (penaltyblog scraper) | **Done** (403-blocked live; cache ready) |
 | 2 | soccerdata (unified scrapers) | Still deferred — cssselect vs scrapling |
-| 3 | FastAPI platform | Planned |
+| 3 | FastAPI platform | **Done** |
 
 ## Cost summary
 

@@ -296,8 +296,44 @@ poetry run python main.py --enrichment-roi --limit 500
 
 ### Next 3 actions
 1. Let `--archive-chaos --limit 0` finish locally (or resume; skips already-cached rows)
-2. Phase 3: FastAPI platform
+2. ~~Phase 3: FastAPI platform~~ **Done (Entry 009)**
 3. Populate live intel via `--predict --refresh-cache` when fixtures land
+
+---
+
+## Entry 009 — 2026-06-23 (Phase 3 — FastAPI platform)
+
+### Completed
+- `api/` package: `app.py`, `schemas.py`, `services.py`, routers (`health`, `status`, `predictions`, `backtest`)
+- HTTP endpoints: `/`, `/health`, `/status`, `/fixtures/upcoming`, `/predictions` (GET/POST), `/backtest` (GET/POST)
+- Service layer wraps `GameForger`, cache stats, fixture readiness (reuses `main.py` pipeline helpers)
+- CLI: `--serve [--host] [--port]` starts uvicorn; OpenAPI docs at `/docs`
+- Deps: `fastapi`, `uvicorn[standard]`, `httpx`
+- `tests/test_api.py` (7 tests)
+
+### Run locally
+```bash
+poetry run python main.py --serve
+# or: poetry run uvicorn api.app:app --reload --port 8000
+curl http://127.0.0.1:8000/status
+curl "http://127.0.0.1:8000/backtest?limit=80"
+```
+
+### Notes
+- `/predictions` returns empty list + message when no upcoming Big 5 fixtures (same as CLI)
+- `dry_run=true` skips live intel scrape (ingested odds only)
+- CORS open (`*`) for future UI consumers
+
+### Verified run
+```
+poetry run pytest tests/ -q
+# 113 passed, 1 skipped
+```
+
+### Next 3 actions
+1. Let `--archive-chaos --limit 0` finish (weather cache)
+2. Populate live intel via `--predict --refresh-cache` when fixtures land
+3. Optional: web UI or auth layer on top of API
 
 ---
 

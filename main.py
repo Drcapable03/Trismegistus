@@ -323,6 +323,18 @@ def main():
         "--prep-skip-weather", action="store_true",
         help="With --prep-caches: skip chaos weather archive",
     )
+    parser.add_argument(
+        "--serve", action="store_true",
+        help="Start FastAPI HTTP server (Phase 3 platform)",
+    )
+    parser.add_argument(
+        "--host", type=str, default="127.0.0.1",
+        help="Bind host with --serve",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000,
+        help="Bind port with --serve",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -335,6 +347,7 @@ def main():
         args.tune_dc_blend, args.expand_history,
         args.kelly_sim, args.validate_live, args.fetch_odds,
         args.calibrate_intel, args.intel_roi, args.enrichment_roi, args.prep_caches,
+        args.serve,
     ])
 
     print("Trismegistus is alive!")
@@ -477,6 +490,12 @@ def main():
                     f"ROI {sim['roi_pct']:+.1f}%, bankroll {sim['final_bankroll']:.1f}, "
                     f"max DD {sim['max_drawdown_pct']:.1f}% ({sim['bets']} bets)"
                 )
+    if args.serve:
+        import uvicorn
+
+        print(f"Starting API at http://{args.host}:{args.port} (docs: /docs)")
+        uvicorn.run("api.app:app", host=args.host, port=args.port, reload=False)
+        return
     print("Done.")
 
 
