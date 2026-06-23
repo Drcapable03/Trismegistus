@@ -263,6 +263,41 @@ poetry run pytest tests/ -q
 
 ---
 
+## Entry 008 — 2026-06-23 (Operational cache prep)
+
+### Completed
+- Full Understat xG pull: **8,908 matches** cached (Big 5, seasons 2021–2025)
+- `scripts/prep_caches.py` + CLI `--prep-caches` (orchestrates xG + StatsBomb + weather archive)
+- Enrichment ROI after Understat fill: **83.2%** holdout xG overlap; selective ROI delta **+45.9%** vs shots-only proxy (limit=500 ablation)
+- Started full `--fetch-statsbomb` and `--archive-chaos --limit 0` (long-running background jobs)
+
+### Cache status (after Understat)
+| Source | Rows |
+|--------|------|
+| Understat xG | 8,908 |
+| StatsBomb xG | 77 → full fetch in progress |
+| FBref xG | 0 (403-blocked) |
+| Chaos weather | 111 → archive in progress |
+
+### Intel note
+- **0 upcoming Big 5 fixtures** in DB — live intel fills on `--predict --refresh-cache` when football-data publishes fixtures
+
+### Commands
+```bash
+poetry run python main.py --prep-caches --limit 0          # all three steps
+poetry run python main.py --fetch-xg                       # Understat only
+poetry run python main.py --fetch-statsbomb                # StatsBomb full (slow)
+poetry run python main.py --archive-chaos --limit 0        # weather for all completed
+poetry run python main.py --enrichment-roi --limit 500
+```
+
+### Next 3 actions
+1. Let `--fetch-statsbomb` and `--archive-chaos` finish locally
+2. Re-run `--enrichment-roi --limit 500` after StatsBomb completes
+3. Phase 3: FastAPI platform
+
+---
+
 ## Template for next entry
 
 ```

@@ -307,6 +307,22 @@ def main():
         "--enrichment-roi", action="store_true",
         help="Report xG enrichment coverage and holdout ablation ROI",
     )
+    parser.add_argument(
+        "--prep-caches", action="store_true",
+        help="Populate Understat/StatsBomb xG and chaos weather caches",
+    )
+    parser.add_argument(
+        "--prep-skip-xg", action="store_true",
+        help="With --prep-caches: skip Understat fetch",
+    )
+    parser.add_argument(
+        "--prep-skip-statsbomb", action="store_true",
+        help="With --prep-caches: skip StatsBomb fetch",
+    )
+    parser.add_argument(
+        "--prep-skip-weather", action="store_true",
+        help="With --prep-caches: skip chaos weather archive",
+    )
     args = parser.parse_args()
 
     use_cache = not args.no_cache
@@ -318,7 +334,7 @@ def main():
         args.tune_edge, args.tune_edge_leagues,
         args.tune_dc_blend, args.expand_history,
         args.kelly_sim, args.validate_live, args.fetch_odds,
-        args.calibrate_intel, args.intel_roi, args.enrichment_roi,
+        args.calibrate_intel, args.intel_roi, args.enrichment_roi, args.prep_caches,
     ])
 
     print("Trismegistus is alive!")
@@ -432,6 +448,16 @@ def main():
         run_enrichment_roi(
             limit=args.limit if args.limit > 0 else 200,
             use_cache=use_cache,
+        )
+    if args.prep_caches:
+        from scripts.prep_caches import prep_caches
+        archive_limit = None if args.limit == 0 else args.limit
+        prep_caches(
+            fetch_understat=not args.prep_skip_xg,
+            fetch_statsbomb_data=not args.prep_skip_statsbomb,
+            statsbomb_limit=args.fetch_statsbomb_limit,
+            archive_weather=not args.prep_skip_weather,
+            archive_limit=archive_limit,
         )
     if args.kelly_sim:
         from evaluation.kelly import kelly_simulation
