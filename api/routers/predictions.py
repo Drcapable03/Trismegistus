@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from api.auth import require_api_key
 from api.schemas import PredictRequest, PredictResponse
 from api.services import generate_predictions
 
-router = APIRouter(tags=["predictions"])
+router = APIRouter(tags=["predictions"], dependencies=[Depends(require_api_key)])
 
 
 def _predict_from_params(

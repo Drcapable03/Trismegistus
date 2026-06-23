@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trismegistus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">⚽</span>
+        <div>
+          <h1>Trismegistus</h1>
+          <p class="tagline">Big 5 match intelligence &amp; edge picks</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="health-pill" class="pill pill-muted">checking…</span>
+        <button type="button" id="api-key-btn" class="btn btn-ghost" hidden>API key</button>
+        <a href="/docs" class="btn btn-ghost" target="_blank" rel="noopener">OpenAPI</a>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-panel="dashboard" role="tab" aria-selected="true">Dashboard</button>
+      <button class="tab" data-panel="fixtures" role="tab">Fixtures</button>
+      <button class="tab" data-panel="predictions" role="tab">Predictions</button>
+      <button class="tab" data-panel="backtest" role="tab">Backtest</button>
+    </nav>
+
+    <main>
+      <section id="panel-dashboard" class="panel active" role="tabpanel">
+        <div class="panel-head">
+          <h2>Pipeline status</h2>
+          <button type="button" class="btn btn-primary" id="refresh-status">Refresh</button>
+        </div>
+        <p id="fixture-guidance" class="guidance"></p>
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="card">
+          <h3>Cache coverage</h3>
+          <div class="cache-bars" id="cache-bars"></div>
+        </div>
+      </section>
+
+      <section id="panel-fixtures" class="panel" role="tabpanel" hidden>
+        <div class="panel-head">
+          <h2>Upcoming fixtures</h2>
+          <div class="inline-controls">
+            <label>Limit <input type="number" id="fixtures-limit" value="20" min="0" max="500" /></label>
+            <button type="button" class="btn btn-primary" id="load-fixtures">Load</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="fixtures-table">
+            <thead>
+              <tr><th>League</th><th>Date</th><th>Home</th><th>Away</th><th>B365 H/D/A</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="fixtures-empty" class="empty-msg" hidden>No upcoming Big 5 fixtures in the database.</p>
+      </section>
+
+      <section id="panel-predictions" class="panel" role="tabpanel" hidden>
+        <div class="panel-head">
+          <h2>Live predictions</h2>
+        </div>
+        <form id="predict-form" class="form-grid">
+          <label>Confidence %
+            <input type="number" name="confidence" value="75" min="0" max="100" step="1" />
+          </label>
+          <label>Train limit <span class="hint">0 = all</span>
+            <input type="number" name="train_limit" value="0" min="0" />
+          </label>
+          <label>Predict limit <span class="hint">0 = all</span>
+            <input type="number" name="predict_limit" value="10" min="0" />
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="dry_run" checked />
+            Dry run (ingested odds only)
+          </label>
+          <button type="submit" class="btn btn-primary span-2">Run predictions</button>
+        </form>
+        <p id="predict-message" class="guidance"></p>
+        <div id="predictions-list" class="pick-list"></div>
+      </section>
+
+      <section id="panel-backtest" class="panel" role="tabpanel" hidden>
+        <div class="panel-head">
+          <h2>Holdout backtest</h2>
+        </div>
+        <form id="backtest-form" class="form-grid">
+          <label>Match limit <span class="hint">0 = all completed</span>
+            <input type="number" name="limit" value="200" min="0" />
+          </label>
+          <button type="submit" class="btn btn-primary">Run backtest</button>
+        </form>
+        <div id="backtest-metrics" class="stat-grid"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Educational analytics only — not betting advice.
+    </footer>
+  </div>
+
+  <dialog id="api-key-dialog" class="modal">
+    <form method="dialog" id="api-key-form">
+      <h3>API key required</h3>
+      <p>Set <code>TRIS_API_KEY</code> on the server. Enter the same key to use the dashboard.</p>
+      <input type="password" id="api-key-input" placeholder="X-API-Key value" autocomplete="off" />
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="api-key-clear">Clear</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

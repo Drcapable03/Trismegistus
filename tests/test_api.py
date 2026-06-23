@@ -26,7 +26,60 @@ def test_root_lists_endpoints():
     assert response.status_code == 200
     body = response.json()
     assert body["name"] == "Trismegistus"
+    assert body["ui"] == "/ui"
     assert "/predictions" in body["endpoints"]["predictions"]
+
+
+def test_ui_dashboard_served():
+    response = _client().get("/ui")
+    assert response.status_code == 200
+    assert "Trismegistus" in response.text
+
+
+def test_static_assets_served():
+    response = _client().get("/static/app.js")
+    assert response.status_code == 200
+    assert "apiFetch" in response.text
+
+
+def test_auth_config_endpoint():
+    response = _client().get("/auth/config")
+    assert response.status_code == 200
+    assert response.json()["auth_required"] is False
+
+
+def test_status_requires_api_key_when_configured(monkeypatch):
+    monkeypatch.setenv("TRIS_API_KEY", "test-secret-key")
+    fake_status = {
+        "version": "0.3.0",
+        "leagues": "Big 5",
+        "matches_total": 100,
+        "matches_completed": 90,
+        "caches": {"understat": 90, "statsbomb": 10, "fbref": 0, "chaos": 50},
+        "fixture_readiness": {
+            "as_of": today(),
+            "div_codes": ["E0"],
+            "completed_big5": 90,
+            "uncompleted_big5": 10,
+            "upcoming_big5": 0,
+            "next_fixture_date": None,
+            "ready_for_live_predict": False,
+            "guidance": "No fixtures.",
+        },
+    }
+    with patch("api.routers.status.get_status", return_value=fake_status):
+        client = TestClient(create_app())
+        assert client.get("/status").status_code == 401
+        assert client.get("/status", headers={"X-API-Key": "wrong"}).status_code == 401
+        assert client.get("/status", headers={"X-API-Key": "test-secret-key"}).status_code == 200
+
+
+def test_health_public_when_auth_configured(monkeypatch):
+    monkeypatch.setenv("TRIS_API_KEY", "test-secret-key")
+    client = TestClient(create_app())
+    assert client.get("/health").status_code == 200
+    assert client.get("/ui").status_code == 200
+    assert client.get("/auth/config").status_code == 200
 
 
 def test_status_endpoint():
@@ -72,11 +125,24 @@ def test_predictions_empty_when_no_fixtures():
 
 
 def test_backtest_endpoint_small_limit():
-    response = _client().get("/backtest?limit=80")
+    fake = {
+        "metrics": {
+            "holdout_accuracy_pct": 55.0,
+            "bookie_accuracy_pct": 50.0,
+            "selective_accuracy_pct": 60.0,
+            "selective_picks": 12,
+            "all_picks": 80,
+            "selective_roi_pct": -5.0,
+            "train_matches": 64,
+            "test_matches": 16,
+        },
+        "div_codes": ["E0", "SP1", "D1", "I1", "F1"],
+    }
+    with patch("api.routers.backtest.run_backtest_summary", return_value=fake):
+        response = _client().get("/backtest?limit=80")
     assert response.status_code == 200
     body = response.json()
-    assert "metrics" in body
-    assert "holdout_accuracy_pct" in body["metrics"]
+    assert body["metrics"]["holdout_accuracy_pct"] == 55.0
     assert body["div_codes"]
 
 

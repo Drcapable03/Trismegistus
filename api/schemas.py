@@ -133,4 +133,9 @@ class RootResponse(BaseModel):
     name: str
     version: str
     docs: str
+    ui: str
     endpoints: dict[str, str]
+
+
+class AuthConfigResponse(BaseModel):
+    auth_required: bool

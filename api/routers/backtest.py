@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from api.auth import require_api_key
 from api.schemas import BacktestRequest, BacktestResponse
 from api.services import run_backtest_summary
 
-router = APIRouter(tags=["backtest"])
+router = APIRouter(tags=["backtest"], dependencies=[Depends(require_api_key)])
 
 
 def _backtest_from_params(

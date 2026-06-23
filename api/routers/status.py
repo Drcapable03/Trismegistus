@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from api.auth import require_api_key
 from api.schemas import FixtureItem, StatusResponse
 from api.services import get_status, list_upcoming_fixtures
 
-router = APIRouter(tags=["status"])
+router = APIRouter(tags=["status"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/status", response_model=StatusResponse)

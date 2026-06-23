@@ -333,7 +333,37 @@ poetry run pytest tests/ -q
 ### Next 3 actions
 1. Let `--archive-chaos --limit 0` finish (weather cache)
 2. Populate live intel via `--predict --refresh-cache` when fixtures land
-3. Optional: web UI or auth layer on top of API
+3. ~~Optional: web UI or auth layer on top of API~~ **Done (Entry 010)**
+
+---
+
+## Entry 010 — 2026-06-23 (Web UI + API auth)
+
+### Completed
+- Dashboard at `/ui` — `web/static/` (HTML/CSS/JS): status, fixtures, predictions, backtest tabs
+- Static assets mounted at `/static`
+- Optional API-key auth via `TRIS_API_KEY` + `X-API-Key` header on protected routes
+- Public routes: `/health`, `/ui`, `/static/*`, `/auth/config`, `/docs`
+- Protected routes: `/status`, `/fixtures/upcoming`, `/predictions`, `/backtest`
+- UI stores API key in `localStorage` when auth is enabled
+- `api/auth.py`, `api/routers/ui.py`; 5 new tests (118 total)
+
+### Run locally
+```bash
+# Dev (no auth)
+poetry run python main.py --serve
+# http://127.0.0.1:8000/ui
+
+# With auth — add to .env:
+# TRIS_API_KEY=your-secret-here
+# Enter same key in dashboard modal or send header:
+curl -H "X-API-Key: your-secret-here" http://127.0.0.1:8000/status
+```
+
+### Next 3 actions
+1. Let `--archive-chaos --limit 0` finish (weather cache)
+2. Re-ingest + `--fetch-xg` after pytest if DB/cache wiped
+3. Populate live intel when new-season fixtures land
 
 ---
 
